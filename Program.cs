@@ -1,11 +1,12 @@
 using System.Text;
-using Microsoft.AspNetCore.Authentication.JwtBearer;
-using Microsoft.IdentityModel.Tokens;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.AspNetCore.Server.Kestrel.Core;
+using Microsoft.OpenApi;
+
 using expensesTracker26.Application.Requests;
 using expensesTracker26.Infrastructure;
-using Microsoft.OpenApi;
+using Microsoft.OpenApi.Models;
+using Microsoft.IdentityModel.Tokens;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -30,33 +31,21 @@ builder.Services.AddGrpc();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(c =>
 {
-    c.AddSecurityDefinition("Bearer", new OpenApiSecurityScheme
+    var securityScheme = new OpenApiSecurityScheme
     {
         Name = "Authorization",
         Type = SecuritySchemeType.Http,
         Scheme = "Bearer",
         BearerFormat = "JWT",
         In = ParameterLocation.Header,
-        Description = "Enter: Bearer {your JWT token}"
-    });
+        Description = "Enter: Bearer {token}"
+    };
 
-    // c.AddSecurityRequirement(new OpenApiSecurityRequirement
-    // {
-    //     {
-    //         new OpenApiSecurityScheme
-    //         {
-    //             Reference = new OpenApiReference
-    //             {
-    //                 Type = ReferenceType.SecurityScheme,
-    //                 Id = "Bearer"
-    //             }
-    //         },
-    //         Array.Empty<string>()
-    //     }
-    // });
+    c.AddSecurityDefinition("Bearer", securityScheme);
 
+    // Apply to all operations
+    c.OperationFilter<AddBearerAuthHeaderOperationFilter>();
 });
-
 
 // Read connection string from appsettings.json
 var connectionString = builder.Configuration.GetConnectionString("DefaultConnection");
@@ -99,61 +88,76 @@ app.MapPost("/api/incomes", async (IncomeSourceRequest income, IFinanceService s
 {
     await service.AddIncomeSource(income);
     return Results.Ok();
-}).RequireAuthorization();
+}).RequireAuthorization().WithTags("Income");
 
 app.MapPost("/api/expenses", async (ExpenseRequest expense, IFinanceService service) =>
 {
     await service.AddExpense(expense);
     return Results.Ok();
-}).RequireAuthorization();
+}).RequireAuthorization().WithTags("Expenses");
 
 
 app.MapPost("/api/expenses-bulk", async (List<ExpenseRequest> expenses, IFinanceService service) =>
 {
     await service.AddExpense(expenses);
     return Results.Ok();
-}).RequireAuthorization();
+}).RequireAuthorization().WithTags("Expenses");
 
 app.MapPost("/api/bills", async (BillsHolderRequest billsHolder, IFinanceService service) =>
 {
     await service.AddBillsHolder(billsHolder);
     return Results.Ok();
-}).RequireAuthorization();
+}).RequireAuthorization().WithTags("Bills");
 app.MapPost("/api/register", async (AppUserRequest billsHolder, ILoginService service) =>
 {
-    await service.RegisterAsync(billsHolder);
-    return Results.Ok();
-});
+    var ret = await service.RegisterAsync(billsHolder);
+    return Results.Ok(ret);
+}).WithTags("Authentication");
 
 app.MapPost("/api/login", async (AppUserRequest billsHolder, ILoginService service) =>
 {
-    await service.LoginAsync(billsHolder);
-    return Results.Ok();
-});
+    var ret = await service.LoginAsync(billsHolder);
+    return Results.Ok(ret);
+}).WithTags("Authentication");
 app.MapGet("/api/incomes", async (IFinanceService service) =>
 {
-    return Results.Ok(await service.GetIncomeSourcesAsync());
-}).RequireAuthorization();
+    var ret = await service.GetIncomeSourcesAsync();
+    return Results.Ok(ret);
+}).RequireAuthorization().WithTags("Income");
 app.MapGet("/api/bills/unpaid-bills", async (IFinanceService service) =>
 {
-    return Results.Ok(await service.GetUnpaidBills());
-}).RequireAuthorization();
+    var ret = await service.GetUnpaidBills();
+    return Results.Ok(ret);
+}).RequireAuthorization().WithTags("Bills");
 
 app.MapGet("/api/bills/paid-bills-forthemonth/{monthId}/{year}", async (int monthId, int year, IFinanceService service) =>
 {
-    return Results.Ok(await service.GetPaidBillsForTheMonth(monthId, year));
-}).RequireAuthorization();
+    var ret = await service.GetPaidBillsForTheMonth(monthId, year);
+    return Results.Ok(ret);
+}).RequireAuthorization().WithTags("Bills");
 
 app.MapGet("/api/bills/unpaid-bills-forthemonth/{monthId}/{year}", async (int monthId, int year, IFinanceService service) =>
 {
-    return Results.Ok(await service.GetUnPaidBillsForTheMonth(monthId, year));
-}).RequireAuthorization();
+    var ret = await service.GetUnPaidBillsForTheMonth(monthId, year);
+    return Results.Ok(ret);
+}).RequireAuthorization().WithTags("Bills");
 
+app.MapPost("/api/bills/paid-bill/{billid}", async (int billid, BillsHolderRequest bill, IFinanceService service) =>
+{
+    await service.EditBillsHolder(bill, billid);
+    return Results.Ok();
+}).RequireAuthorization().WithTags("Bills");
 
+app.MapPost("/api/bills/flag-bill/{billid}", async (int billid, bool isPaid, IFinanceService service) =>
+{
+    await service.FlagIsPaid(billid, isPaid);
+    return Results.Ok();
+}).RequireAuthorization().WithTags("Bills");
 app.MapGet("/api/expenses", async (IFinanceService service) =>
 {
-    return Results.Ok(await service.GetExpensesAsync());
-}).RequireAuthorization();
+    var ret = await service.GetExpensesAsync();
+    return Results.Ok(ret);
+}).RequireAuthorization().WithTags("Expenses");
 
 
 

@@ -1,7 +1,4 @@
 using System.Globalization;
-using System.IdentityModel.Tokens.Jwt;
-using System.Security.Claims;
-using System.Text;
 using expensesTracker26.Application.Requests;
 using expensesTracker26.Domain;
 using expensesTracker26.Infrastructure;
@@ -10,6 +7,8 @@ using Microsoft.IdentityModel.Tokens;
 
 public interface IFinanceService
 {
+    Task EditBillsHolder(BillsHolderRequest b, int id);
+    Task FlagIsPaid(int id, bool isPaid);
     Task<ReturnObject> GetUnpaidBills();
     Task<ReturnObject> GetPaidBillsForTheMonth(int monthId, int yearId);
     Task<ReturnObject> GetUnPaidBillsForTheMonth(int monthId, int yearId);
@@ -35,6 +34,9 @@ public class FinanceService : IFinanceService
 
     private int UserId => _httpContextAccessor.HttpContext?.User?.GetUserId()
      ?? throw new InvalidOperationException("No HttpContext available");
+
+    public IReadOnlyCollection<int> GetUserWithAdmin =>
+          new[] { 0, UserId };
 
     public async Task AddIncomeSource(IncomeSourceRequest income)
     {
@@ -85,10 +87,34 @@ public class FinanceService : IFinanceService
         });
         await _db.SaveChangesAsync();
     }
+    public async Task EditBillsHolder(BillsHolderRequest b, int id)
+    {
+        await _db.BillsHolders
+            .Where(o => o.Id == id && o.CreatedBy == UserId)
+            .ExecuteUpdateAsync(setters => setters
+                .SetProperty(o => o.IncomeSourceId, b.IncomeSourceId)
+                .SetProperty(o => o.ExpenseId, b.ExpenseId)
+                .SetProperty(o => o.MonthId, b.MonthId)
+                .SetProperty(o => o.YearId, b.Year)
+                .SetProperty(o => o.IsPaid, b.IsPaid)
+                .SetProperty(o => o.UpdatedAt, DateTime.UtcNow)
+            );
+    }
+    public async Task FlagIsPaid(int id, bool isPaid)
+    {
+        await _db.BillsHolders
+            .Where(o => o.Id == id && o.CreatedBy == UserId)
+            .ExecuteUpdateAsync(setters => setters
+                .SetProperty(o => o.IsPaid, isPaid)
+                .SetProperty(o => o.UpdatedAt, DateTime.UtcNow)
+            );
+    }
+
+
     public async Task<ReturnObject> GetIncomeSourcesAsync()
     {
         var result = new ReturnObject();
-        var incomes = await GetIncomeQuery().ToListAsync();
+        var incomes = await GetIncomeQuery(GetUserWithAdmin).ToListAsync();
         result.Status = true;
         result.Data = incomes;
         return result;
@@ -97,7 +123,7 @@ public class FinanceService : IFinanceService
     public async Task<ReturnObject> GetExpensesAsync()
     {
         var result = new ReturnObject();
-        var expenses = await GetExpenseQuery().ToListAsync();
+        var expenses = await GetExpenseQuery(GetUserWithAdmin).ToListAsync();
         result.Status = true;
         result.Data = expenses;
 
@@ -108,7 +134,7 @@ public class FinanceService : IFinanceService
     {
         var result = new ReturnObject();
 
-        var billfilter = GetBillsQuery(UserId)
+        var billfilter = GetBillsQuery(GetUserWithAdmin)
             .Where(b => b.Paid && b.MonthId == monthId && b.Year == yearId)
             .AsQueryable();
         var bills = billfilter.ToList();
@@ -122,7 +148,7 @@ public class FinanceService : IFinanceService
     {
         var result = new ReturnObject();
 
-        var billsFilter = GetBillsQuery(UserId)
+        var billsFilter = GetBillsQuery(GetUserWithAdmin)
             .Where(b => !b.Paid && b.MonthId == monthId && b.Year == yearId)
             .AsQueryable();
         var bills = billsFilter.ToList();
@@ -134,7 +160,7 @@ public class FinanceService : IFinanceService
     public async Task<ReturnObject> GetUnpaidBills()
     {
         var result = new ReturnObject();
-        var billFilter = GetBillsQuery(UserId)
+        var billFilter = GetBillsQuery(GetUserWithAdmin)
             .Where(b => !b.Paid).AsQueryable();
         var bills = billFilter.ToList();
         result.Status = true;
@@ -159,18 +185,18 @@ public class FinanceService : IFinanceService
         _db.BillsHolders.Add(link);
         await _db.SaveChangesAsync();
     }
-    private IQueryable<IncomeSource> GetIncomeQuery()
+    private IQueryable<IncomeSource> GetIncomeQuery(IReadOnlyCollection<int> userId)
     {
-        return _db.IncomeSources.Where(i => i.CreatedBy == UserId).AsQueryable();
+        return _db.IncomeSources.Where(i => userId.Contains(i.CreatedBy)).AsQueryable();
     }
-    private IQueryable<Expense> GetExpenseQuery()
+    private IQueryable<Expense> GetExpenseQuery(IReadOnlyCollection<int> userId)
     {
-        return _db.Expenses.Where(e => e.CreatedBy == UserId).AsQueryable();
+        return _db.Expenses.Where(e => userId.Contains(e.CreatedBy)).AsQueryable();
     }
-    private IQueryable<BillResponse> GetBillsQuery(int userId)
+    private IQueryable<BillResponse> GetBillsQuery(IReadOnlyCollection<int> userId)
     {
         return _db.BillsHolders
-            .Where(o => o.CreatedBy == userId)
+            .Where(o => userId.Contains(o.CreatedBy))
             .Include(b => b.IncomeSource)
             .Include(b => b.Expense)
              .AsEnumerable()

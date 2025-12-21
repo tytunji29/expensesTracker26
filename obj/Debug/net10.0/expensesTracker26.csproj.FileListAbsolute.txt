@@ -13,7 +13,6 @@
 /Users/elvisonobo/Documents/Ty/expensesTracker26/bin/Debug/net10.0/Grpc.Net.Client.dll
 /Users/elvisonobo/Documents/Ty/expensesTracker26/bin/Debug/net10.0/Grpc.Net.ClientFactory.dll
 /Users/elvisonobo/Documents/Ty/expensesTracker26/bin/Debug/net10.0/Grpc.Net.Common.dll
-/Users/elvisonobo/Documents/Ty/expensesTracker26/bin/Debug/net10.0/Microsoft.AspNetCore.OpenApi.dll
 /Users/elvisonobo/Documents/Ty/expensesTracker26/bin/Debug/net10.0/Microsoft.OpenApi.dll
 /Users/elvisonobo/Documents/Ty/expensesTracker26/bin/Debug/net10.0/Swashbuckle.AspNetCore.Swagger.dll
 /Users/elvisonobo/Documents/Ty/expensesTracker26/bin/Debug/net10.0/Swashbuckle.AspNetCore.SwaggerGen.dll
