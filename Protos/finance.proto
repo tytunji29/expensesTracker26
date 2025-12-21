@@ -1,0 +1,88 @@
+syntax = "proto3";
+
+option csharp_namespace = "expensesTracker26.Grpc";
+
+service FinanceServiceGrpc {
+  // Income
+  rpc GetIncomeSources (Empty) returns (IncomeList);
+  rpc AddIncome (IncomeRequest) returns (Income);
+
+  // Expense
+  rpc GetExpenses (Empty) returns (ExpenseList);
+  rpc AddExpense (ExpenseRequest) returns (Expense);
+
+  // BillsHolder
+  rpc LinkIncomeToExpense (BillsHolderRequest) returns (Empty);
+  rpc GetBillsHolders (Empty) returns (BillsHolderList);
+  rpc GetBillsHoldersByMonthId (MonthRequest) returns (BillsHolderList);
+  rpc GetBillsHoldersByMonthAndYear (MonthYearRequest) returns (BillsHolderList);
+}
+
+// Models
+message Income {
+  int32 id = 1;
+  string name = 2;
+  double amount = 3;
+}
+
+message Expense {
+  int32 id = 1;
+  string name = 2;
+  double amount = 3;
+}
+
+message BillsHolder {
+  int32 id = 1;
+  int32 incomeSourceId = 2;
+  int32 expenseId = 3;
+  string incomeName = 4;
+  string expenseName = 5;
+  double incomeAmount = 6;
+  double expenseAmount = 7;
+  int32 monthId = 8;
+  int32 yearId = 9;
+  bool isPaid=10;
+}
+
+// Requests
+message IncomeRequest {
+  string name = 1;
+  double amount = 2;
+}
+
+message ExpenseRequest {
+  string name = 1;
+  double amount = 2;
+}
+
+message BillsHolderRequest {
+  int32 incomeSourceId = 1;
+  int32 expenseId = 2;
+  int32 monthId =3;
+  int32 yearId =4;
+  bool isPaid =5;
+}
+
+message MonthRequest {
+  int32 monthId = 1;
+}
+
+message MonthYearRequest {
+  int32 monthId = 1;
+  int32 yearId = 2;
+}
+
+// Responses
+message IncomeList {
+  repeated Income items = 1;
+}
+
+message ExpenseList {
+  repeated Expense items = 1;
+}
+
+message BillsHolderList {
+  repeated BillsHolder items = 1;
+}
+
+message Empty {}
