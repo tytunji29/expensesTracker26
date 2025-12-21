@@ -55,6 +55,13 @@ app.MapPost("/api/expenses", async (ExpenseRequest expense, IFinanceService serv
     return Results.Ok();
 });
 
+
+app.MapPost("/api/expenses-bulk", async (List<ExpenseRequest> expenses, IFinanceService service) =>
+{
+    await service.AddExpense(expenses);
+    return Results.Ok();
+});
+
 app.MapPost("/api/bills", async (BillsHolderRequest billsHolder, IFinanceService service) =>
 {
     await service.AddBillsHolder(billsHolder);

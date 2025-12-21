@@ -10,6 +10,7 @@ public interface IFinanceService
     Task<ReturnObject> GetUnPaidBillsForTheMonth(int monthId, int yearId);
     Task AddIncomeSource(IncomeSourceRequest income);
     Task AddExpense(ExpenseRequest expense);
+    Task AddExpense(List<ExpenseRequest> expenses);
     Task AddBillsHolder(BillsHolderRequest billsHolder);
     Task<ReturnObject> GetIncomeSourcesAsync();
     Task<ReturnObject> GetExpensesAsync();
@@ -35,6 +36,19 @@ public class FinanceService : IFinanceService
         await _db.SaveChangesAsync();
     }
 
+    public async Task AddExpense(List<ExpenseRequest> expenses)
+    {
+        var expenseEntities = expenses
+       .Select(e => new Expense
+       {
+           Name = e.Name,
+           Amount = e.Amount
+       })
+       .ToList();
+
+        await _db.Expenses.AddRangeAsync(expenseEntities);
+        await _db.SaveChangesAsync();
+    }
     public async Task AddExpense(ExpenseRequest expense)
     {
         _db.Expenses.Add(new Expense

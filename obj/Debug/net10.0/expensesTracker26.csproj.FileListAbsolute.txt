@@ -187,3 +187,4 @@
 /Users/elvisonobo/Documents/Ty/expensesTracker26/bin/Debug/net10.0/zh-Hans/Microsoft.CodeAnalysis.Workspaces.MSBuild.resources.dll
 /Users/elvisonobo/Documents/Ty/expensesTracker26/bin/Debug/net10.0/zh-Hant/Microsoft.CodeAnalysis.Workspaces.MSBuild.resources.dll
 /Users/elvisonobo/Documents/Ty/expensesTracker26/bin/Debug/net10.0/runtimes/win/lib/net9.0/System.Windows.Extensions.dll
+/Users/elvisonobo/Documents/Ty/expensesTracker26/obj/Debug/net10.0/expensesTracker26.sourcelink.json
