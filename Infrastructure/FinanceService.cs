@@ -1,7 +1,12 @@
+using System.Globalization;
+using System.IdentityModel.Tokens.Jwt;
+using System.Security.Claims;
+using System.Text;
 using expensesTracker26.Application.Requests;
 using expensesTracker26.Domain;
 using expensesTracker26.Infrastructure;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.IdentityModel.Tokens;
 
 public interface IFinanceService
 {
@@ -20,18 +25,25 @@ public interface IFinanceService
 public class FinanceService : IFinanceService
 {
     private readonly AppDbContext _db;
+    private readonly IHttpContextAccessor _httpContextAccessor;
 
-    public FinanceService(AppDbContext db)
+    public FinanceService(AppDbContext db, IHttpContextAccessor httpContextAccessor)
     {
         _db = db;
+        _httpContextAccessor = httpContextAccessor;
     }
-    //do the add methods 
+
+    private int UserId => _httpContextAccessor.HttpContext?.User?.GetUserId()
+     ?? throw new InvalidOperationException("No HttpContext available");
+
     public async Task AddIncomeSource(IncomeSourceRequest income)
     {
         _db.IncomeSources.Add(new IncomeSource
         {
             Name = income.Name,
-            Amount = income.Amount
+            Amount = income.Amount,
+            CreatedBy = UserId
+
         });
         await _db.SaveChangesAsync();
     }
@@ -42,7 +54,8 @@ public class FinanceService : IFinanceService
        .Select(e => new Expense
        {
            Name = e.Name,
-           Amount = e.Amount
+           Amount = e.Amount,
+           CreatedBy = UserId
        })
        .ToList();
 
@@ -54,7 +67,8 @@ public class FinanceService : IFinanceService
         _db.Expenses.Add(new Expense
         {
             Name = expense.Name,
-            Amount = expense.Amount
+            Amount = expense.Amount,
+            CreatedBy = UserId
         });
         await _db.SaveChangesAsync();
     }
@@ -66,100 +80,66 @@ public class FinanceService : IFinanceService
             ExpenseId = billsHolder.ExpenseId,
             MonthId = billsHolder.MonthId,
             YearId = billsHolder.Year,
-            IsPaid = billsHolder.IsPaid
+            IsPaid = billsHolder.IsPaid,
+            CreatedBy = UserId
         });
         await _db.SaveChangesAsync();
     }
     public async Task<ReturnObject> GetIncomeSourcesAsync()
     {
         var result = new ReturnObject();
-        try
-        {
-            var incomes = await GetIncomeQuery().ToListAsync();
-            result.Status = true;
-            result.Data = incomes;
-        }
-        catch (Exception ex)
-        {
-            result.Status = false;
-            result.Message = ex.Message;
-        }
+        var incomes = await GetIncomeQuery().ToListAsync();
+        result.Status = true;
+        result.Data = incomes;
         return result;
     }
 
     public async Task<ReturnObject> GetExpensesAsync()
     {
         var result = new ReturnObject();
-        try
-        {
-            var expenses = await GetExpenseQuery().ToListAsync();
-            result.Status = true;
-            result.Data = expenses;
-        }
-        catch (Exception ex)
-        {
-            result.Status = false;
-            result.Message = ex.Message;
-        }
+        var expenses = await GetExpenseQuery().ToListAsync();
+        result.Status = true;
+        result.Data = expenses;
+
         return result;
     }
 
     public async Task<ReturnObject> GetPaidBillsForTheMonth(int monthId, int yearId)
     {
         var result = new ReturnObject();
-        try
-        {
-            var bills = await GetBillsQuery()
-                .Where(b => b.IsPaid && b.MonthId == monthId && b.YearId == yearId)
-                .ToListAsync();
 
-            result.Status = true;
-            result.Data = bills;
-        }
-        catch (Exception ex)
-        {
-            result.Status = false;
-            result.Message = ex.Message;
-        }
+        var billfilter = GetBillsQuery(UserId)
+            .Where(b => b.Paid && b.MonthId == monthId && b.Year == yearId)
+            .AsQueryable();
+        var bills = billfilter.ToList();
+        result.Status = true;
+        result.Data = bills;
+
         return result;
     }
 
     public async Task<ReturnObject> GetUnPaidBillsForTheMonth(int monthId, int yearId)
     {
         var result = new ReturnObject();
-        try
-        {
-            var bills = await GetBillsQuery()
-                .Where(b => !b.IsPaid && b.MonthId == monthId && b.YearId == yearId)
-                .ToListAsync();
 
-            result.Status = true;
-            result.Data = bills;
-        }
-        catch (Exception ex)
-        {
-            result.Status = false;
-            result.Message = ex.Message;
-        }
+        var billsFilter = GetBillsQuery(UserId)
+            .Where(b => !b.Paid && b.MonthId == monthId && b.Year == yearId)
+            .AsQueryable();
+        var bills = billsFilter.ToList();
+        result.Status = true;
+        result.Data = bills;
+
         return result;
     }
     public async Task<ReturnObject> GetUnpaidBills()
     {
         var result = new ReturnObject();
-        try
-        {
-            var bills = await GetBillsQuery()
-                .Where(b => !b.IsPaid)
-                .ToListAsync();
+        var billFilter = GetBillsQuery(UserId)
+            .Where(b => !b.Paid).AsQueryable();
+        var bills = billFilter.ToList();
+        result.Status = true;
+        result.Data = bills;
 
-            result.Status = true;
-            result.Data = bills;
-        }
-        catch (Exception ex)
-        {
-            result.Status = false;
-            result.Message = ex.Message;
-        }
         return result;
     }
 
@@ -172,7 +152,8 @@ public class FinanceService : IFinanceService
             ExpenseId = billsHolder.ExpenseId,
             MonthId = billsHolder.MonthId,
             YearId = billsHolder.Year,
-            IsPaid = billsHolder.IsPaid
+            IsPaid = billsHolder.IsPaid,
+            CreatedBy = UserId
         };
 
         _db.BillsHolders.Add(link);
@@ -180,18 +161,36 @@ public class FinanceService : IFinanceService
     }
     private IQueryable<IncomeSource> GetIncomeQuery()
     {
-        return _db.IncomeSources.AsQueryable();
+        return _db.IncomeSources.Where(i => i.CreatedBy == UserId).AsQueryable();
     }
     private IQueryable<Expense> GetExpenseQuery()
     {
-        return _db.Expenses.AsQueryable();
+        return _db.Expenses.Where(e => e.CreatedBy == UserId).AsQueryable();
     }
-    private IQueryable<BillsHolder> GetBillsQuery()
+    private IQueryable<BillResponse> GetBillsQuery(int userId)
     {
         return _db.BillsHolders
+            .Where(o => o.CreatedBy == userId)
             .Include(b => b.IncomeSource)
             .Include(b => b.Expense)
+             .AsEnumerable()
+            .Select(b => new BillResponse
+            {
+                Id = b.Id,
+                MonthId = b.MonthId,
+                IncomeSourceName = b.IncomeSource.Name,
+                ExpenseName = b.Expense.Name,
+                Month = GetMonthName(b.MonthId),
+                Year = b.YearId,
+                Paid = b.IsPaid
+            })
             .AsQueryable();
     }
+    private string GetMonthName(int monthId)
+    {
+        if (monthId < 1 || monthId > 12)
+            return "Unknown";
 
+        return CultureInfo.CurrentCulture.DateTimeFormat.GetMonthName(monthId);
+    }
 }

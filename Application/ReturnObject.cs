@@ -26,3 +26,16 @@ public class ReturnObject
         source = sourceType;
     }
 }
+
+
+public class BillResponse
+{
+    public int Id { get; set; }
+
+    public string IncomeSourceName { get; set; }
+    public string ExpenseName { get; set; }
+    public int MonthId { get; set; }
+    public string Month { get; set; }
+    public int Year { get; set; }
+    public bool Paid { get; set; }
+}

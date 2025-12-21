@@ -7,6 +7,7 @@ public class AppDbContext : DbContext
 {
     public AppDbContext(DbContextOptions<AppDbContext> options)
         : base(options) { }
+    public DbSet<AppUser> Users => Set<AppUser>();
 
     public DbSet<IncomeSource> IncomeSources => Set<IncomeSource>();
     public DbSet<Expense> Expenses => Set<Expense>();
@@ -28,7 +29,7 @@ public class AppDbContext : DbContext
             .HasForeignKey(b => b.IncomeSourceId);
 
         modelBuilder.Entity<BillsHolder>()
-            .HasIndex(b => new { b.ExpenseId, b.IncomeSourceId })
-            .IsUnique();
+            .HasIndex(b => new { b.ExpenseId, b.IncomeSourceId, b.MonthId, b.YearId })
+    .IsUnique();
     }
 }

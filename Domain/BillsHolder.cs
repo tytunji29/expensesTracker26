@@ -1,6 +1,6 @@
 namespace expensesTracker26.Domain;
 
-public class BillsHolder
+public class BillsHolder : BaseEntity
 {
     public int Id { get; set; }
 

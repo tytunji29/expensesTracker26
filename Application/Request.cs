@@ -19,3 +19,9 @@ public class BillsHolderRequest
     public required int Year { get; set; }
     public required bool IsPaid { get; set; }
 }
+
+public class AppUserRequest
+{
+    public required string Email { get; set; }
+    public required string Password { get; set; }
+}
