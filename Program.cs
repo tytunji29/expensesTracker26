@@ -10,7 +10,7 @@ using Microsoft.IdentityModel.Tokens;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// ===== Configure Kestrel for gRPC (HTTP/2) =====
+
 builder.WebHost.ConfigureKestrel(options =>
 {
     // gRPC requires HTTP/2
@@ -19,13 +19,12 @@ builder.WebHost.ConfigureKestrel(options =>
         o.Protocols = HttpProtocols.Http2; // gRPC
     });
 
-    // Optional: REST/Swagger on separate port (HTTP/1.1)
-    options.ListenLocalhost(5079, o =>
+    // REST/Swagger on all network interfaces
+    options.Listen(System.Net.IPAddress.Any, 5079, o =>
     {
         o.Protocols = HttpProtocols.Http1; // REST + Swagger
     });
 });
-
 // REST + gRPC
 builder.Services.AddGrpc();
 builder.Services.AddEndpointsApiExplorer();
@@ -96,6 +95,17 @@ app.MapPost("/api/expenses", async (ExpenseRequest expense, IFinanceService serv
     return Results.Ok();
 }).RequireAuthorization().WithTags("Expenses");
 
+app.MapPost("/api/update-incomesource", async (UpdateById<IncomeSourceRequest> income, IFinanceService service) =>
+{
+    await service.UpdateIncomeSource(income);
+    return Results.Ok();
+}).RequireAuthorization().WithTags("Income");
+
+app.MapPost("/api/update-expense", async (UpdateById<ExpenseRequest> expense, IFinanceService service) =>
+{
+    await service.UpdateExpense(expense);
+    return Results.Ok();
+}).RequireAuthorization().WithTags("Expenses");
 
 app.MapPost("/api/expenses-bulk", async (List<ExpenseRequest> expenses, IFinanceService service) =>
 {

@@ -10,9 +10,11 @@ public interface IFinanceService
     Task EditBillsHolder(BillsHolderRequest b, int id);
     Task FlagIsPaid(int id, bool isPaid);
     Task<ReturnObject> GetUnpaidBills();
+    Task UpdateExpense(UpdateById<ExpenseRequest> expense);
     Task<ReturnObject> GetPaidBillsForTheMonth(int monthId, int yearId);
     Task<ReturnObject> GetUnPaidBillsForTheMonth(int monthId, int yearId);
     Task AddIncomeSource(IncomeSourceRequest income);
+    Task UpdateIncomeSource(UpdateById<IncomeSourceRequest> income);
     Task AddExpense(ExpenseRequest expense);
     Task AddExpense(List<ExpenseRequest> expenses);
     Task AddBillsHolder(BillsHolderRequest billsHolder);
@@ -50,6 +52,26 @@ public class FinanceService : IFinanceService
         await _db.SaveChangesAsync();
     }
 
+    public async Task UpdateIncomeSource(UpdateById<IncomeSourceRequest> income)
+    {
+        await _db.IncomeSources
+    .Where(e => e.CreatedBy == UserId && e.Id == income.Id)
+    .ExecuteUpdateAsync(setters => setters
+        .SetProperty(e => e.Name, income.Data.Name)
+        .SetProperty(e => e.Amount, income.Data.Amount)
+        .SetProperty(e => e.UpdatedAt, DateTime.UtcNow)
+    );
+    }
+    public async Task UpdateExpense(UpdateById<ExpenseRequest> expense)
+    {
+        await _db.Expenses
+    .Where(e => e.CreatedBy == UserId && e.Id == expense.Id)
+    .ExecuteUpdateAsync(setters => setters
+        .SetProperty(e => e.Name, expense.Data.Name)
+        .SetProperty(e => e.Amount, expense.Data.Amount)
+        .SetProperty(e => e.UpdatedAt, DateTime.UtcNow)
+    );
+    }
     public async Task AddExpense(List<ExpenseRequest> expenses)
     {
         var expenseEntities = expenses
@@ -219,4 +241,5 @@ public class FinanceService : IFinanceService
 
         return CultureInfo.CurrentCulture.DateTimeFormat.GetMonthName(monthId);
     }
+
 }

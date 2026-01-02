@@ -1,5 +1,10 @@
 namespace expensesTracker26.Application.Requests;
 
+public class UpdateById<TRequest>
+{
+    public int Id { get; set; }
+    public required TRequest Data { get; set; }
+}
 public class IncomeSourceRequest
 {
     public required string Name { get; set; }

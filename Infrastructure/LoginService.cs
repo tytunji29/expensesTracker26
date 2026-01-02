@@ -30,7 +30,7 @@ public class LoginService : ILoginService
 
         var user = new AppUser
         {
-            Email = request.Email,
+            Email = request.Email.ToLower(),
             PasswordHash = BCrypt.Net.BCrypt.HashPassword(request.Password)
         };
 
@@ -45,24 +45,42 @@ public class LoginService : ILoginService
         };
 
     }
-
     public async Task<ReturnObject> LoginAsync(AppUserRequest request)
     {
-        var user = await _db.Users.FirstOrDefaultAsync(u => u.Email == request.Email);
-        if (user == null) throw new Exception("Invalid credentials");
+        var user = await _db.Users
+            .AsNoTracking()
+            .FirstOrDefaultAsync(u => u.Email.ToLower() == request.Email.ToLower());
 
-        if (!BCrypt.Net.BCrypt.Verify(request.Password, user.PasswordHash))
-            throw new Exception("Invalid credentials");
+        if (user == null || !BCrypt.Net.BCrypt.Verify(request.Password, user.PasswordHash))
+            throw new UnauthorizedAccessException("Invalid credentials");
+
+        var userId = user.Id;
+
+        var totalExpenses = await _db.Expenses
+            .AsNoTracking()
+            .Where(e => e.CreatedBy == userId)
+            .SumAsync(e => e.Amount);
+
+        var totalIncomes = await _db.IncomeSources
+            .AsNoTracking()
+            .Where(i => i.CreatedBy == userId)
+            .SumAsync(i => i.Amount);
 
         var token = GenerateToken(user);
+
         return new ReturnObject
         {
             Status = true,
             Message = "Login successful",
-            Data = token
+            Data = new
+            {
+                token,
+                totalExpenses,
+                totalIncomes,
+                user.Email
+            }
         };
     }
-
 
 
     private string GenerateToken(AppUser user)
