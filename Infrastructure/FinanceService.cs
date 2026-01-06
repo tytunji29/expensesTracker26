@@ -10,17 +10,17 @@ public interface IFinanceService
     Task EditBillsHolder(BillsHolderRequest b, int id);
     Task FlagIsPaid(int id, bool isPaid);
     Task<ReturnObject> GetUnpaidBills();
-    Task UpdateExpense(UpdateById<ExpenseRequest> expense);
     Task<ReturnObject> GetPaidBillsForTheMonth(int monthId, int yearId);
     Task<ReturnObject> GetUnPaidBillsForTheMonth(int monthId, int yearId);
     Task AddIncomeSource(IncomeSourceRequest income);
     Task UpdateIncomeSource(UpdateById<IncomeSourceRequest> income);
-    Task AddExpense(ExpenseRequest expense);
-    Task AddExpense(List<ExpenseRequest> expenses);
+
     Task AddBillsHolder(BillsHolderRequest billsHolder);
     Task<ReturnObject> GetIncomeSourcesAsync();
-    Task<ReturnObject> GetExpensesAsync();
-    Task LinkIncomeToExpense(BillsHolderRequest billsHolder);
+    Task AddBillsHolder(List<BillsHolderRequest> billsHolders);
+    Task AddIncomeSourceForTheMonth(IncomeSourceForTheMonthRequest income);
+    Task<ReturnObject> GetTotalBalanceAsync();
+    //Task LinkIncomeToExpense(BillsHolderRequest billsHolder);
 }
 
 public class FinanceService : IFinanceService
@@ -51,7 +51,24 @@ public class FinanceService : IFinanceService
         });
         await _db.SaveChangesAsync();
     }
+    public async Task AddIncomeSourceForTheMonth(IncomeSourceForTheMonthRequest income)
+    {
+        var incomeSource = await _db.IncomeSources
+            .FirstOrDefaultAsync(i => i.Id == income.Id && i.CreatedBy == UserId && i.IsDeleted == false);
+        if (incomeSource == null)
+            throw new Exception("Income source not found");
+        if (incomeSource.Amount <= 0)
+            throw new Exception("Income source amount must be greater than zero");
 
+        _db.IncomeSourcesForTheMonth.Add(new IncomeSourceForTheMonth
+        {
+            IncomeSourceId = income.Id,
+            Year = DateTime.Now.Year,
+            Month = DateTime.Now.Month,
+            CreatedBy = UserId
+        });
+        await _db.SaveChangesAsync();
+    }
     public async Task UpdateIncomeSource(UpdateById<IncomeSourceRequest> income)
     {
         await _db.IncomeSources
@@ -62,62 +79,177 @@ public class FinanceService : IFinanceService
         .SetProperty(e => e.UpdatedAt, DateTime.UtcNow)
     );
     }
-    public async Task UpdateExpense(UpdateById<ExpenseRequest> expense)
-    {
-        await _db.Expenses
-    .Where(e => e.CreatedBy == UserId && e.Id == expense.Id)
-    .ExecuteUpdateAsync(setters => setters
-        .SetProperty(e => e.Name, expense.Data.Name)
-        .SetProperty(e => e.Amount, expense.Data.Amount)
-        .SetProperty(e => e.UpdatedAt, DateTime.UtcNow)
-    );
-    }
-    public async Task AddExpense(List<ExpenseRequest> expenses)
-    {
-        var expenseEntities = expenses
-       .Select(e => new Expense
-       {
-           Name = e.Name,
-           Amount = e.Amount,
-           CreatedBy = UserId
-       })
-       .ToList();
 
-        await _db.Expenses.AddRangeAsync(expenseEntities);
-        await _db.SaveChangesAsync();
-    }
-    public async Task AddExpense(ExpenseRequest expense)
-    {
-        _db.Expenses.Add(new Expense
-        {
-            Name = expense.Name,
-            Amount = expense.Amount,
-            CreatedBy = UserId
-        });
-        await _db.SaveChangesAsync();
-    }
+
     public async Task AddBillsHolder(BillsHolderRequest billsHolder)
     {
+        int currentMonth = DateTime.UtcNow.Month;
+        int currentYear = DateTime.UtcNow.Year;
+
+        // 1. Get all income sources for the month
+        var incomeSourcesForTheMonth = await _db.IncomeSourcesForTheMonth
+            .Where(i =>
+                i.Month == currentMonth &&
+                i.Year == currentYear &&
+                i.CreatedBy == UserId)
+            .OrderBy(i => i.CreatedAt)
+            .ToListAsync();
+
+        if (!incomeSourcesForTheMonth.Any())
+            throw new Exception("No income sources found for the current month. Please add an income source.");
+
+        // 2. Get total expenses already allocated per income source
+        var expensesByIncomeSource = await _db.BillsHolders
+            .Where(b =>
+                b.MonthId == currentMonth &&
+                b.YearId == currentYear &&
+                b.CreatedBy == UserId)
+            .GroupBy(b => b.IncomeSourceId)
+            .Select(g => new
+            {
+                IncomeSourceId = g.Key,
+                TotalExpense = g.Sum(x => x.ExpenseAmount)
+            })
+            .ToListAsync();
+
+        // 3. Try to find an income source that can cover this bill
+        IncomeSourceForTheMonth? selectedIncomeSource = null;
+
+        foreach (var incomeSource in incomeSourcesForTheMonth)
+        {
+            var alreadySpent = expensesByIncomeSource
+                .FirstOrDefault(x => x.IncomeSourceId == incomeSource.Id)?
+                .TotalExpense ?? 0;
+
+            var remainingAmount = incomeSource.IncomeSource.Amount - alreadySpent;
+
+            if (remainingAmount >= billsHolder.ExpenseAmount)
+            {
+                selectedIncomeSource = incomeSource;
+                break;
+            }
+        }
+
+        if (selectedIncomeSource == null)
+            throw new Exception("No income source has sufficient balance to cover this bill.");
+
+        // 4. Add bill holder
         _db.BillsHolders.Add(new BillsHolder
         {
-            IncomeSourceId = billsHolder.IncomeSourceId,
-            ExpenseId = billsHolder.ExpenseId,
-            MonthId = billsHolder.MonthId,
-            YearId = billsHolder.Year,
+            ExpenseAmount = billsHolder.ExpenseAmount,
+            ExpenseName = billsHolder.ExpenseName,
+            IncomeSourceId = selectedIncomeSource.Id,
+            MonthId = currentMonth,
+            YearId = currentYear,
             IsPaid = billsHolder.IsPaid,
             CreatedBy = UserId
         });
+
         await _db.SaveChangesAsync();
     }
+
+    public async Task AddBillsHolder(List<BillsHolderRequest> billsHolders)
+    {
+        if (billsHolders == null || !billsHolders.Any())
+            throw new Exception("Bills list cannot be empty.");
+
+        int currentMonth = DateTime.UtcNow.Month;
+        int currentYear = DateTime.UtcNow.Year;
+
+        using var transaction = await _db.Database.BeginTransactionAsync();
+
+        // 1. Get all income sources for the month
+        var incomeSources = await _db.IncomeSourcesForTheMonth
+    .Include(i => i.IncomeSource)
+            .Where(i =>
+                i.Month == currentMonth &&
+                i.Year == currentYear &&
+                i.CreatedBy == UserId)
+            .OrderBy(i => i.CreatedAt)
+            .ToListAsync();
+
+        if (!incomeSources.Any())
+            throw new Exception("No income sources found for the current month. Please add an income source.");
+
+        // 2. Get already allocated expenses per income source
+        var expensesByIncomeSource = await _db.BillsHolders
+            .Where(b =>
+                b.MonthId == currentMonth &&
+                b.YearId == currentYear &&
+                b.CreatedBy == UserId)
+            .GroupBy(b => b.IncomeSourceId)
+            .Select(g => new
+            {
+                IncomeSourceId = g.Key,
+                TotalExpense = g.Sum(x => x.ExpenseAmount)
+            })
+            .ToListAsync();
+
+        // 3. Build remaining balance tracker
+        var remainingBalances = incomeSources.ToDictionary(
+            i => i.Id,
+            i =>
+            {
+                var spent = expensesByIncomeSource
+                    .FirstOrDefault(x => x.IncomeSourceId == i.Id)?
+                    .TotalExpense ?? 0;
+
+                return i.IncomeSource.Amount - spent;
+            });
+
+        var billsToInsert = new List<BillsHolder>();
+
+        // 4. Allocate each bill
+        foreach (var bill in billsHolders)
+        {
+            IncomeSourceForTheMonth? selectedIncomeSource = null;
+
+            foreach (var incomeSource in incomeSources)
+            {
+                var remaining = remainingBalances[incomeSource.Id];
+
+                if (remaining >= bill.ExpenseAmount)
+                {
+                    selectedIncomeSource = incomeSource;
+                    remainingBalances[incomeSource.Id] -= bill.ExpenseAmount;
+                    break;
+                }
+            }
+
+            if (selectedIncomeSource == null)
+                throw new Exception(
+                    $"Insufficient income to cover expense '{bill.ExpenseName}' ({bill.ExpenseAmount}).");
+
+            billsToInsert.Add(new BillsHolder
+            {
+                ExpenseName = bill.ExpenseName,
+                ExpenseAmount = bill.ExpenseAmount,
+                IncomeSourceId = selectedIncomeSource.Id,
+                MonthId = currentMonth,
+                YearId = currentYear,
+                IsPaid = bill.IsPaid,
+                CreatedBy = UserId
+            });
+        }
+
+        // 5. Save once
+        _db.BillsHolders.AddRange(billsToInsert);
+        await _db.SaveChangesAsync();
+
+        await transaction.CommitAsync();
+    }
+
+
+
     public async Task EditBillsHolder(BillsHolderRequest b, int id)
     {
         await _db.BillsHolders
             .Where(o => o.Id == id && o.CreatedBy == UserId)
             .ExecuteUpdateAsync(setters => setters
-                .SetProperty(o => o.IncomeSourceId, b.IncomeSourceId)
-                .SetProperty(o => o.ExpenseId, b.ExpenseId)
-                .SetProperty(o => o.MonthId, b.MonthId)
-                .SetProperty(o => o.YearId, b.Year)
+                // .SetProperty(o => o.IncomeSourceId, b.IncomeSourceId)
+                //.SetProperty(o => o.ExpenseId, b.ExpenseId)
+                //.SetProperty(o => o.MonthId, b.MonthId)
+                //.SetProperty(o => o.YearId, b.Year)
                 .SetProperty(o => o.IsPaid, b.IsPaid)
                 .SetProperty(o => o.UpdatedAt, DateTime.UtcNow)
             );
@@ -142,16 +274,51 @@ public class FinanceService : IFinanceService
         return result;
     }
 
-    public async Task<ReturnObject> GetExpensesAsync()
+    public async Task<ReturnObject> GetTotalBalanceAsync()
     {
-        var result = new ReturnObject();
-        var expenses = await GetExpenseQuery(GetUserWithAdmin).ToListAsync();
-        result.Status = true;
-        result.Data = expenses;
+        int currentMonth = DateTime.UtcNow.Month;
+        int currentYear = DateTime.UtcNow.Year;
 
-        return result;
+        // 1. Get all income sources for the month
+        var incomeSources = await _db.IncomeSourcesForTheMonth
+    .Include(i => i.IncomeSource)
+            .Where(i =>
+                i.Month == currentMonth &&
+                i.Year == currentYear &&
+                i.CreatedBy == UserId)
+            .OrderBy(i => i.CreatedAt)
+            .ToListAsync();
+        var expensesByIncomeSource = await _db.BillsHolders
+        .Where(b =>
+            b.MonthId == currentMonth &&
+            b.YearId == currentYear &&
+            b.CreatedBy == UserId)
+        .GroupBy(b => b.IncomeSourceId)
+        .Select(g => new
+        {
+            IncomeSourceId = g.Key,
+            TotalExpense = g.Sum(x => x.ExpenseAmount)
+        })
+        .ToListAsync();
+
+        // 3. Build remaining balance tracker
+        var remainingBalances = incomeSources.ToDictionary(
+            i => i.Id,
+            i =>
+            {
+                var spent = expensesByIncomeSource
+                    .FirstOrDefault(x => x.IncomeSourceId == i.Id)?
+                    .TotalExpense ?? 0;
+
+                return i.IncomeSource.Amount - spent;
+            });
+        return new ReturnObject
+        {
+            Status = true,
+            Data = remainingBalances.Values.Sum()
+        };
+
     }
-
     public async Task<ReturnObject> GetPaidBillsForTheMonth(int monthId, int yearId)
     {
         var result = new ReturnObject();
@@ -191,43 +358,24 @@ public class FinanceService : IFinanceService
         return result;
     }
 
-
-    public async Task LinkIncomeToExpense(BillsHolderRequest billsHolder)
-    {
-        var link = new BillsHolder
-        {
-            IncomeSourceId = billsHolder.IncomeSourceId,
-            ExpenseId = billsHolder.ExpenseId,
-            MonthId = billsHolder.MonthId,
-            YearId = billsHolder.Year,
-            IsPaid = billsHolder.IsPaid,
-            CreatedBy = UserId
-        };
-
-        _db.BillsHolders.Add(link);
-        await _db.SaveChangesAsync();
-    }
     private IQueryable<IncomeSource> GetIncomeQuery(IReadOnlyCollection<int> userId)
     {
         return _db.IncomeSources.Where(i => userId.Contains(i.CreatedBy)).AsQueryable();
-    }
-    private IQueryable<Expense> GetExpenseQuery(IReadOnlyCollection<int> userId)
-    {
-        return _db.Expenses.Where(e => userId.Contains(e.CreatedBy)).AsQueryable();
     }
     private IQueryable<BillResponse> GetBillsQuery(IReadOnlyCollection<int> userId)
     {
         return _db.BillsHolders
             .Where(o => userId.Contains(o.CreatedBy))
             .Include(b => b.IncomeSource)
-            .Include(b => b.Expense)
+             // .Include(b => b.Expense)
              .AsEnumerable()
             .Select(b => new BillResponse
             {
                 Id = b.Id,
                 MonthId = b.MonthId,
+                ExpenseAmount = b.ExpenseAmount,
                 IncomeSourceName = b.IncomeSource.Name,
-                ExpenseName = b.Expense.Name,
+                ExpenseName = b.ExpenseName,
                 Month = GetMonthName(b.MonthId),
                 Year = b.YearId,
                 Paid = b.IsPaid
@@ -241,5 +389,6 @@ public class FinanceService : IFinanceService
 
         return CultureInfo.CurrentCulture.DateTimeFormat.GetMonthName(monthId);
     }
+
 
 }

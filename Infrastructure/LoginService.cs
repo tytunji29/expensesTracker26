@@ -47,6 +47,9 @@ public class LoginService : ILoginService
     }
     public async Task<ReturnObject> LoginAsync(AppUserRequest request)
     {
+
+        int currentMonth = DateTime.UtcNow.Month;
+        int currentYear = DateTime.UtcNow.Year;
         var user = await _db.Users
             .AsNoTracking()
             .FirstOrDefaultAsync(u => u.Email.ToLower() == request.Email.ToLower());
@@ -56,15 +59,15 @@ public class LoginService : ILoginService
 
         var userId = user.Id;
 
-        var totalExpenses = await _db.Expenses
+        var totalExpenses = await _db.BillsHolders
             .AsNoTracking()
-            .Where(e => e.CreatedBy == userId)
-            .SumAsync(e => e.Amount);
+            .Where(e => e.CreatedBy == userId && e.MonthId == currentMonth && e.YearId == currentYear)
+            .SumAsync(e => e.ExpenseAmount);
 
-        var totalIncomes = await _db.IncomeSources
+        var totalIncomes = await _db.IncomeSourcesForTheMonth
             .AsNoTracking()
-            .Where(i => i.CreatedBy == userId)
-            .SumAsync(i => i.Amount);
+            .Where(i => i.CreatedBy == userId && i.Month == currentMonth && i.Year == currentYear)
+            .SumAsync(i => i.IncomeSource.Amount);
 
         var token = GenerateToken(user);
 
@@ -77,6 +80,7 @@ public class LoginService : ILoginService
                 token,
                 totalExpenses,
                 totalIncomes,
+                totalBalance = totalIncomes - totalExpenses,
                 user.Email
             }
         };

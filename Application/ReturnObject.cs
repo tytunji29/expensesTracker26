@@ -34,6 +34,7 @@ public class BillResponse
 
     public string IncomeSourceName { get; set; }
     public string ExpenseName { get; set; }
+    public decimal ExpenseAmount { get; set; }
     public int MonthId { get; set; }
     public string Month { get; set; }
     public int Year { get; set; }

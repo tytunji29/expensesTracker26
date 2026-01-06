@@ -5,6 +5,20 @@ public class UpdateById<TRequest>
     public int Id { get; set; }
     public required TRequest Data { get; set; }
 }
+
+
+// public interface IUpdateById
+// {
+//     int Id { get; set; }
+// }
+// public class UpdateIncomeSourceRequest : IncomeSourceRequest, IUpdateById
+// {
+//     public int Id { get; set; }
+// }
+public class IncomeSourceForTheMonthRequest
+{
+    public int Id { get; set; }
+}
 public class IncomeSourceRequest
 {
     public required string Name { get; set; }
@@ -18,10 +32,8 @@ public class ExpenseRequest
 
 public class BillsHolderRequest
 {
-    public required int IncomeSourceId { get; set; }
-    public required int ExpenseId { get; set; }
-    public required int MonthId { get; set; }
-    public required int Year { get; set; }
+    public required decimal ExpenseAmount { get; set; }
+    public required string ExpenseName { get; set; }
     public required bool IsPaid { get; set; }
 }
 

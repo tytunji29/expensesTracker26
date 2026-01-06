@@ -89,11 +89,11 @@ app.MapPost("/api/incomes", async (IncomeSourceRequest income, IFinanceService s
     return Results.Ok();
 }).RequireAuthorization().WithTags("Income");
 
-app.MapPost("/api/expenses", async (ExpenseRequest expense, IFinanceService service) =>
+app.MapPost("/api/IncomeSourceForTheMonth", async (IncomeSourceForTheMonthRequest income, IFinanceService service) =>
 {
-    await service.AddExpense(expense);
+    await service.AddIncomeSourceForTheMonth(income);
     return Results.Ok();
-}).RequireAuthorization().WithTags("Expenses");
+}).RequireAuthorization().WithTags("IncomeForTheMonth");
 
 app.MapPost("/api/update-incomesource", async (UpdateById<IncomeSourceRequest> income, IFinanceService service) =>
 {
@@ -101,19 +101,25 @@ app.MapPost("/api/update-incomesource", async (UpdateById<IncomeSourceRequest> i
     return Results.Ok();
 }).RequireAuthorization().WithTags("Income");
 
-app.MapPost("/api/update-expense", async (UpdateById<ExpenseRequest> expense, IFinanceService service) =>
-{
-    await service.UpdateExpense(expense);
-    return Results.Ok();
-}).RequireAuthorization().WithTags("Expenses");
+// app.MapPost("/api/update-expense", async (UpdateById<ExpenseRequest> expense, IFinanceService service) =>
+// {
+//     await service.UpdateExpense(expense);
+//     return Results.Ok();
+// }).RequireAuthorization().WithTags("Expenses");
 
-app.MapPost("/api/expenses-bulk", async (List<ExpenseRequest> expenses, IFinanceService service) =>
-{
-    await service.AddExpense(expenses);
-    return Results.Ok();
-}).RequireAuthorization().WithTags("Expenses");
+// app.MapPost("/api/expenses-bulk", async (List<ExpenseRequest> expenses, IFinanceService service) =>
+// {
+//     await service.AddExpense(expenses);
+//     return Results.Ok();
+// }).RequireAuthorization().WithTags("Expenses");
 
 app.MapPost("/api/bills", async (BillsHolderRequest billsHolder, IFinanceService service) =>
+{
+    await service.AddBillsHolder(billsHolder);
+    return Results.Ok();
+}).RequireAuthorization().WithTags("Bills");
+
+app.MapPost("/api/bills-list", async (List<BillsHolderRequest> billsHolder, IFinanceService service) =>
 {
     await service.AddBillsHolder(billsHolder);
     return Results.Ok();
@@ -152,6 +158,12 @@ app.MapGet("/api/bills/unpaid-bills-forthemonth/{monthId}/{year}", async (int mo
     return Results.Ok(ret);
 }).RequireAuthorization().WithTags("Bills");
 
+app.MapGet("/api/unplanned-balance", async (IFinanceService service) =>
+{
+    var ret = await service.GetTotalBalanceAsync();
+    return Results.Ok(ret);
+}).RequireAuthorization().WithTags("Bills");
+
 app.MapPost("/api/bills/paid-bill/{billid}", async (int billid, BillsHolderRequest bill, IFinanceService service) =>
 {
     await service.EditBillsHolder(bill, billid);
@@ -163,16 +175,16 @@ app.MapPost("/api/bills/flag-bill/{billid}", async (int billid, bool isPaid, IFi
     await service.FlagIsPaid(billid, isPaid);
     return Results.Ok();
 }).RequireAuthorization().WithTags("Bills");
-app.MapGet("/api/expenses", async (IFinanceService service) =>
-{
-    var ret = await service.GetExpensesAsync();
-    return Results.Ok(ret);
-}).RequireAuthorization().WithTags("Expenses");
+// app.MapGet("/api/expenses", async (IFinanceService service) =>
+// {
+//     var ret = await service.GetExpensesAsync();
+//     return Results.Ok(ret);
+// }).RequireAuthorization().WithTags("Expenses");
 
 
 
 // ===== gRPC =====
-app.MapGrpcService<FinanceGrpcService>();
+//app.MapGrpcService<FinanceGrpcService>();
 app.UseMiddleware<ExceptionMiddleware>();
 
 app.UseAuthentication();

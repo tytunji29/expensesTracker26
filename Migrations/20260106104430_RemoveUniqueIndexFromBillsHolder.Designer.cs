@@ -12,8 +12,8 @@ using expensesTracker26.Infrastructure;
 namespace expensesTracker26.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    [Migration("20251221222430_AddMonthYearToBillsHoldlll")]
-    partial class AddMonthYearToBillsHoldlll
+    [Migration("20260106104430_RemoveUniqueIndexFromBillsHolder")]
+    partial class RemoveUniqueIndexFromBillsHolder
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
@@ -60,11 +60,18 @@ namespace expensesTracker26.Migrations
                     b.Property<int>("CreatedBy")
                         .HasColumnType("integer");
 
-                    b.Property<int>("ExpenseId")
-                        .HasColumnType("integer");
+                    b.Property<decimal>("ExpenseAmount")
+                        .HasColumnType("numeric");
+
+                    b.Property<string>("ExpenseName")
+                        .IsRequired()
+                        .HasColumnType("text");
 
                     b.Property<int>("IncomeSourceId")
                         .HasColumnType("integer");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("boolean");
 
                     b.Property<bool>("IsPaid")
                         .HasColumnType("boolean");
@@ -80,41 +87,9 @@ namespace expensesTracker26.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("IncomeSourceId");
-
-                    b.HasIndex("ExpenseId", "IncomeSourceId", "MonthId", "YearId")
-                        .IsUnique();
+                    b.HasIndex("IncomeSourceId", "MonthId", "YearId");
 
                     b.ToTable("BillsHolders");
-                });
-
-            modelBuilder.Entity("expensesTracker26.Domain.Expense", b =>
-                {
-                    b.Property<int>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("integer");
-
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
-
-                    b.Property<decimal>("Amount")
-                        .HasColumnType("numeric");
-
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<int>("CreatedBy")
-                        .HasColumnType("integer");
-
-                    b.Property<string>("Name")
-                        .IsRequired()
-                        .HasColumnType("text");
-
-                    b.Property<DateTime>("UpdatedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.HasKey("Id");
-
-                    b.ToTable("Expenses");
                 });
 
             modelBuilder.Entity("expensesTracker26.Domain.IncomeSource", b =>
@@ -134,6 +109,9 @@ namespace expensesTracker26.Migrations
                     b.Property<int>("CreatedBy")
                         .HasColumnType("integer");
 
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("boolean");
+
                     b.Property<string>("Name")
                         .IsRequired()
                         .HasColumnType("text");
@@ -146,28 +124,62 @@ namespace expensesTracker26.Migrations
                     b.ToTable("IncomeSources");
                 });
 
+            modelBuilder.Entity("expensesTracker26.Domain.IncomeSourceForTheMonth", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int>("CreatedBy")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("IncomeSourceId")
+                        .HasColumnType("integer");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("boolean");
+
+                    b.Property<int>("Month")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int>("Year")
+                        .HasColumnType("integer");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("IncomeSourceId");
+
+                    b.ToTable("IncomeSourcesForTheMonth");
+                });
+
             modelBuilder.Entity("expensesTracker26.Domain.BillsHolder", b =>
                 {
-                    b.HasOne("expensesTracker26.Domain.Expense", "Expense")
-                        .WithMany("BillsHolders")
-                        .HasForeignKey("ExpenseId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
                     b.HasOne("expensesTracker26.Domain.IncomeSource", "IncomeSource")
                         .WithMany("BillsHolders")
                         .HasForeignKey("IncomeSourceId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
-                    b.Navigation("Expense");
-
                     b.Navigation("IncomeSource");
                 });
 
-            modelBuilder.Entity("expensesTracker26.Domain.Expense", b =>
+            modelBuilder.Entity("expensesTracker26.Domain.IncomeSourceForTheMonth", b =>
                 {
-                    b.Navigation("BillsHolders");
+                    b.HasOne("expensesTracker26.Domain.IncomeSource", "IncomeSource")
+                        .WithMany()
+                        .HasForeignKey("IncomeSourceId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("IncomeSource");
                 });
 
             modelBuilder.Entity("expensesTracker26.Domain.IncomeSource", b =>

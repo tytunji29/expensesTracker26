@@ -5,33 +5,32 @@
 namespace expensesTracker26.Migrations
 {
     /// <inheritdoc />
-    public partial class AddMonthYearToBillsHolderUniqueIndex : Migration
+    public partial class RemoveUniqueIndexFromBillsHolder : Migration
     {
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
         {
             migrationBuilder.DropIndex(
-                name: "IX_BillsHolders_ExpenseId_IncomeSourceId",
+                name: "IX_BillsHolders_IncomeSourceId_MonthId_YearId",
                 table: "BillsHolders");
 
             migrationBuilder.CreateIndex(
-                name: "IX_BillsHolders_ExpenseId_IncomeSourceId_MonthId_YearId",
+                name: "IX_BillsHolders_IncomeSourceId_MonthId_YearId",
                 table: "BillsHolders",
-                columns: new[] { "ExpenseId", "IncomeSourceId", "MonthId", "YearId" },
-                unique: true);
+                columns: new[] { "IncomeSourceId", "MonthId", "YearId" });
         }
 
         /// <inheritdoc />
         protected override void Down(MigrationBuilder migrationBuilder)
         {
             migrationBuilder.DropIndex(
-                name: "IX_BillsHolders_ExpenseId_IncomeSourceId_MonthId_YearId",
+                name: "IX_BillsHolders_IncomeSourceId_MonthId_YearId",
                 table: "BillsHolders");
 
             migrationBuilder.CreateIndex(
-                name: "IX_BillsHolders_ExpenseId_IncomeSourceId",
+                name: "IX_BillsHolders_IncomeSourceId_MonthId_YearId",
                 table: "BillsHolders",
-                columns: new[] { "ExpenseId", "IncomeSourceId" },
+                columns: new[] { "IncomeSourceId", "MonthId", "YearId" },
                 unique: true);
         }
     }
