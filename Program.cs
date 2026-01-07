@@ -101,17 +101,6 @@ app.MapPost("/api/update-incomesource", async (UpdateById<IncomeSourceRequest> i
     return Results.Ok();
 }).RequireAuthorization().WithTags("Income");
 
-// app.MapPost("/api/update-expense", async (UpdateById<ExpenseRequest> expense, IFinanceService service) =>
-// {
-//     await service.UpdateExpense(expense);
-//     return Results.Ok();
-// }).RequireAuthorization().WithTags("Expenses");
-
-// app.MapPost("/api/expenses-bulk", async (List<ExpenseRequest> expenses, IFinanceService service) =>
-// {
-//     await service.AddExpense(expenses);
-//     return Results.Ok();
-// }).RequireAuthorization().WithTags("Expenses");
 
 app.MapPost("/api/bills", async (BillsHolderRequest billsHolder, IFinanceService service) =>
 {
@@ -143,6 +132,11 @@ app.MapGet("/api/incomes", async (IFinanceService service) =>
 app.MapGet("/api/bills/unpaid-bills", async (IFinanceService service) =>
 {
     var ret = await service.GetUnpaidBills();
+    return Results.Ok(ret);
+}).RequireAuthorization().WithTags("Bills");
+app.MapGet("/api/bills/allbills", async (IFinanceService service) =>
+{
+    var ret = await service.GetAllBillsForTheMonth();
     return Results.Ok(ret);
 }).RequireAuthorization().WithTags("Bills");
 

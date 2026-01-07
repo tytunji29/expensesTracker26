@@ -11,6 +11,7 @@ public interface IFinanceService
     Task FlagIsPaid(int id, bool isPaid);
     Task<ReturnObject> GetUnpaidBills();
     Task<ReturnObject> GetPaidBillsForTheMonth(int monthId, int yearId);
+    Task<ReturnObject> GetAllBillsForTheMonth();
     Task<ReturnObject> GetUnPaidBillsForTheMonth(int monthId, int yearId);
     Task AddIncomeSource(IncomeSourceRequest income);
     Task UpdateIncomeSource(UpdateById<IncomeSourceRequest> income);
@@ -339,6 +340,21 @@ public class FinanceService : IFinanceService
 
         var billsFilter = GetBillsQuery(GetUserWithAdmin)
             .Where(b => !b.Paid && b.MonthId == monthId && b.Year == yearId)
+            .AsQueryable();
+        var bills = billsFilter.ToList();
+        result.Status = true;
+        result.Data = bills;
+
+        return result;
+    }
+    public async Task<ReturnObject> GetAllBillsForTheMonth()
+    {
+        var currentMonth = DateTime.UtcNow.Month;
+        var currentYear = DateTime.UtcNow.Year;
+        var result = new ReturnObject();
+
+        var billsFilter = GetBillsQuery(GetUserWithAdmin)
+            .Where(b => b.MonthId == currentMonth && b.Year == currentYear)
             .AsQueryable();
         var bills = billsFilter.ToList();
         result.Status = true;
