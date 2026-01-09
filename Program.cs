@@ -102,16 +102,16 @@ app.MapPost("/api/update-incomesource", async (UpdateById<IncomeSourceRequest> i
 }).RequireAuthorization().WithTags("Income");
 
 
-app.MapPost("/api/bills", async (BillsHolderRequest billsHolder, IFinanceService service) =>
-{
-    await service.AddBillsHolder(billsHolder);
-    return Results.Ok();
-}).RequireAuthorization().WithTags("Bills");
+// app.MapPost("/api/bills", async (BillsHolderRequest billsHolder, IFinanceService service) =>
+// {
+//     await service.AddBillsHolder(billsHolder);
+//     return Results.Ok();
+// }).RequireAuthorization().WithTags("Bills");
 
 app.MapPost("/api/bills-list", async (List<BillsHolderRequest> billsHolder, IFinanceService service) =>
 {
-    await service.AddBillsHolder(billsHolder);
-    return Results.Ok();
+    var res = await service.AddBillsHolder(billsHolder);
+    return Results.Ok(res);
 }).RequireAuthorization().WithTags("Bills");
 app.MapPost("/api/register", async (AppUserRequest billsHolder, ILoginService service) =>
 {

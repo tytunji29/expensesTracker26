@@ -36,6 +36,7 @@ public class BillResponse
     public string ExpenseName { get; set; }
     public decimal ExpenseAmount { get; set; }
     public int MonthId { get; set; }
+    public int PaymentDate { get; set; }
     public string Month { get; set; }
     public int Year { get; set; }
     public bool Paid { get; set; }

@@ -10,6 +10,7 @@ public class IncomeSource : BaseEntity
     public required string Name { get; set; }
 
     public decimal Amount { get; set; }
+    public int PaymentDate { get; set; }
 
     [JsonIgnore]
 
