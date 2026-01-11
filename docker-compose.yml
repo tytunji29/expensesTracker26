@@ -1,0 +1,17 @@
+services:
+  api:
+    build: .
+    container_name: expensestracker-api
+    ports:
+      - "5079:5079"
+      - "5080:5080"
+    environment:
+      ASPNETCORE_ENVIRONMENT: Development
+      ConnectionStrings__DefaultConnection: >
+        Host=ep-autumn-haze-ahr34962-pooler.c-3.us-east-1.aws.neon.tech;
+        Port=5432;
+        Database=neondb;
+        Username=neondb_owner;
+        Password=npg_Cyr6vt2NAiWx;
+        SSL Mode=Require;
+        Trust Server Certificate=true

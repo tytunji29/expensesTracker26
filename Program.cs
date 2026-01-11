@@ -13,18 +13,19 @@ var builder = WebApplication.CreateBuilder(args);
 
 builder.WebHost.ConfigureKestrel(options =>
 {
-    // gRPC requires HTTP/2
-    options.ListenLocalhost(5080, o =>
+    // gRPC (HTTP/2 - clear text)
+    options.ListenAnyIP(5080, o =>
     {
-        o.Protocols = HttpProtocols.Http2; // gRPC
+        o.Protocols = HttpProtocols.Http2;
     });
 
-    // REST/Swagger on all network interfaces
-    options.Listen(System.Net.IPAddress.Any, 5079, o =>
+    // REST + Swagger
+    options.ListenAnyIP(5079, o =>
     {
-        o.Protocols = HttpProtocols.Http1; // REST + Swagger
+        o.Protocols = HttpProtocols.Http1;
     });
 });
+
 // REST + gRPC
 builder.Services.AddGrpc();
 builder.Services.AddEndpointsApiExplorer();
