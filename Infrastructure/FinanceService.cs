@@ -15,14 +15,12 @@ public interface IFinanceService
     Task<ReturnObject> GetUnPaidBillsForTheMonth(int monthId, int yearId);
     Task AddIncomeSource(IncomeSourceRequest income);
     Task UpdateIncomeSource(UpdateById<IncomeSourceRequest> income);
-
-    //Task<ReturnObject> AddBillsHolder(BillsHolderRequest billsHolder);
     Task<ReturnObject> GetIncomeSourcesAsync();
+    Task<ReturnObject> GetIncomeSourcesBalanceAsync();
     Task<ReturnObject> AddBillsHolder(List<BillsHolderRequest> billsHolders);
     Task AddIncomeSourceForTheMonth(IncomeSourceForTheMonthRequest income);
     Task<ReturnObject> GetTotalBalanceAsync();
     Task FlagIsPaid(List<int> ids);
-    //Task LinkIncomeToExpense(BillsHolderRequest billsHolder);
 }
 
 public class FinanceService : IFinanceService
@@ -176,25 +174,25 @@ public class FinanceService : IFinanceService
 
 
         var totals = await _db.Users
-.Where(u => u.Id == UserId)
-.Select(u => new
-{
-    TotalExpenses = _db.BillsHolders
-        .Where(e =>
+                            .Where(u => u.Id == UserId)
+                            .Select(u => new
+                            {
+                                TotalExpenses = _db.BillsHolders
+                              .Where(e =>
             e.CreatedBy == UserId &&
             e.MonthId == currentMonth &&
             e.YearId == currentYear)
-        .Sum(e => (decimal?)e.ExpenseAmount) ?? 0,
+                                .Sum(e => (decimal?)e.ExpenseAmount) ?? 0,
 
-    TotalIncomes = _db.IncomeSourcesForTheMonth
-        .Where(i =>
+                                TotalIncomes = _db.IncomeSourcesForTheMonth
+                              .Where(i =>
             i.CreatedBy == UserId &&
             i.Month == currentMonth &&
             i.Year == currentYear)
-        .Sum(i => (decimal?)i.IncomeSource.Amount) ?? 0
-})
-.AsNoTracking()
-.FirstAsync();
+                            .Sum(i => (decimal?)i.IncomeSource.Amount) ?? 0
+                            })
+                            .AsNoTracking()
+                            .FirstAsync();
 
         return new ReturnObject
         {
@@ -351,7 +349,26 @@ public class FinanceService : IFinanceService
 
         return result;
     }
+    public async Task<ReturnObject> GetIncomeSourcesBalanceAsync()
+    {
+        var balances = await (
+            from i in _db.IncomeSourcesForTheMonth
+            join a in _db.IncomeSources
+            on i.IncomeSourceId equals a.Id
+            join b in _db.BillsHolders
+                on i.Id equals b.IncomeSourceId into bills
+            select new
+            {
+                i.Id,
+                a.Name,
+                TotalBills = bills.Sum(x => (decimal?)x.ExpenseAmount) ?? 0,
+                Balance = a.Amount -
+                          (bills.Sum(x => (decimal?)x.ExpenseAmount) ?? 0)
+            }
+        ).ToListAsync();
+        return new ReturnObject { Data = balances, Message = "Balance Found Successfully", Status = true };
 
+    }
     private IQueryable<IncomeSource> GetIncomeQuery(IReadOnlyCollection<int> userId)
     {
         return _db.IncomeSources.Where(i => userId.Contains(i.CreatedBy)).AsQueryable();

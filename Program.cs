@@ -129,6 +129,12 @@ app.MapGet("/api/incomes", async (IFinanceService service) =>
     var ret = await service.GetIncomeSourcesAsync();
     return Results.Ok(ret);
 }).RequireAuthorization().WithTags("Income");
+app.MapGet("/api/income-sources/balances", async (IFinanceService service) =>
+{
+    var ret = await service.GetIncomeSourcesBalanceAsync();
+    return Results.Ok(ret);
+}).RequireAuthorization().WithTags("Income");
+
 app.MapGet("/api/bills/unpaid-bills", async (IFinanceService service) =>
 {
     var ret = await service.GetUnpaidBills();
