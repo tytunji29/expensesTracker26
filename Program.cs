@@ -109,9 +109,9 @@ app.MapPost("/api/update-incomesource", async (UpdateById<IncomeSourceRequest> i
 //     return Results.Ok();
 // }).RequireAuthorization().WithTags("Bills");
 
-app.MapPost("/api/bills-list", async (List<BillsHolderRequest> billsHolder, IFinanceService service) =>
+app.MapPost("/api/bills-list/{sourceId}", async (int sourceId, List<BillsHolderRequest> billsHolder, IFinanceService service) =>
 {
-    var res = await service.AddBillsHolder(billsHolder);
+    var res = await service.AddBillsHolder(sourceId, billsHolder);
     return Results.Ok(res);
 }).RequireAuthorization().WithTags("Bills");
 app.MapPost("/api/register", async (AppUserRequest billsHolder, ILoginService service) =>
@@ -176,13 +176,6 @@ app.MapPost("/api/bills/flag-bill/{billid}", async (int billid, bool isPaid, IFi
     await service.FlagIsPaid(billid, isPaid);
     return Results.Ok();
 }).RequireAuthorization().WithTags("Bills");
-// app.MapGet("/api/expenses", async (IFinanceService service) =>
-// {
-//     var ret = await service.GetExpensesAsync();
-//     return Results.Ok(ret);
-// }).RequireAuthorization().WithTags("Expenses");
-
-
 
 // ===== gRPC =====
 //app.MapGrpcService<FinanceGrpcService>();
