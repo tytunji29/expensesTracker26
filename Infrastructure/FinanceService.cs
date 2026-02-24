@@ -21,6 +21,7 @@ public interface IFinanceService
     Task AddIncomeSourceForTheMonth(IncomeSourceForTheMonthRequest income);
     Task<ReturnObject> GetTotalBalanceAsync();
     Task FlagIsPaid(List<int> ids);
+    Task<ReturnObject> GetTotalInvestment(InvestmentHolderRequest investmentHolderRequest);
 }
 
 public class FinanceService : IFinanceService
@@ -34,54 +35,63 @@ public class FinanceService : IFinanceService
         _httpContextAccessor = httpContextAccessor;
     }
 
-    private int UserId => _httpContextAccessor.HttpContext?.User?.GetUserId()
-     ?? throw new InvalidOperationException("No HttpContext available");
+    private int UserId =>
+        _httpContextAccessor.HttpContext?.User?.GetUserId()
+        ?? throw new InvalidOperationException("No HttpContext available");
 
-    public IReadOnlyCollection<int> GetUserWithAdmin =>
-          new[] { 0, UserId };
+    public IReadOnlyCollection<int> GetUserWithAdmin => new[] { 0, UserId };
 
     public async Task AddIncomeSource(IncomeSourceRequest income)
     {
-        _db.IncomeSources.Add(new IncomeSource
-        {
-            Name = income.Name,
-            Amount = income.Amount,
-            CreatedBy = UserId
-
-        });
+        _db.IncomeSources.Add(
+            new IncomeSource
+            {
+                Name = income.Name,
+                Amount = income.Amount,
+                CreatedBy = UserId,
+            }
+        );
         await _db.SaveChangesAsync();
     }
+
     public async Task AddIncomeSourceForTheMonth(IncomeSourceForTheMonthRequest income)
     {
-        var incomeSource = await _db.IncomeSources
-            .FirstOrDefaultAsync(i => i.Id == income.Id && i.CreatedBy == UserId && i.IsDeleted == false);
+        var incomeSource = await _db.IncomeSources.FirstOrDefaultAsync(i =>
+            i.Id == income.Id && i.CreatedBy == UserId && i.IsDeleted == false
+        );
         if (incomeSource == null)
             throw new Exception("Income source not found");
         if (incomeSource.Amount <= 0)
             throw new Exception("Income source amount must be greater than zero");
 
-        _db.IncomeSourcesForTheMonth.Add(new IncomeSourceForTheMonth
-        {
-            IncomeSourceId = income.Id,
-            Year = DateTime.Now.Year,
-            Month = DateTime.Now.Month,
-            CreatedBy = UserId
-        });
+        _db.IncomeSourcesForTheMonth.Add(
+            new IncomeSourceForTheMonth
+            {
+                IncomeSourceId = income.Id,
+                Year = DateTime.Now.Year,
+                Month = DateTime.Now.Month,
+                CreatedBy = UserId,
+            }
+        );
         await _db.SaveChangesAsync();
     }
+
     public async Task UpdateIncomeSource(UpdateById<IncomeSourceRequest> income)
     {
-        await _db.IncomeSources
-    .Where(e => e.CreatedBy == UserId && e.Id == income.Id)
-    .ExecuteUpdateAsync(setters => setters
-        .SetProperty(e => e.Name, income.Data.Name)
-        .SetProperty(e => e.Amount, income.Data.Amount)
-        .SetProperty(e => e.UpdatedAt, DateTime.UtcNow)
-    );
+        await _db
+            .IncomeSources.Where(e => e.CreatedBy == UserId && e.Id == income.Id)
+            .ExecuteUpdateAsync(setters =>
+                setters
+                    .SetProperty(e => e.Name, income.Data.Name)
+                    .SetProperty(e => e.Amount, income.Data.Amount)
+                    .SetProperty(e => e.UpdatedAt, DateTime.UtcNow)
+            );
     }
 
-
-    public async Task<ReturnObject> AddBillsHolder(int sourceId, List<BillsHolderRequest> billsHolders)
+    public async Task<ReturnObject> AddBillsHolder(
+        int sourceId,
+        List<BillsHolderRequest> billsHolders
+    )
     {
         if (billsHolders == null || !billsHolders.Any())
             throw new Exception("Bills list cannot be empty.");
@@ -89,24 +99,30 @@ public class FinanceService : IFinanceService
         int month = DateTime.UtcNow.Month;
         int year = DateTime.UtcNow.Year;
 
-        var incomeSources = await _db.IncomeSourcesForTheMonth
-            .Include(i => i.IncomeSource)
+        var incomeSources = await _db
+            .IncomeSourcesForTheMonth.Include(i => i.IncomeSource)
             .Where(i => i.Month == month && i.Year == year && i.CreatedBy == UserId)
             .OrderBy(i => i.CreatedAt)
             .ToListAsync();
 
         if (!incomeSources.Any())
-            throw new Exception("No income sources found for the current month. Please add an income source.");
+            throw new Exception(
+                "No income sources found for the current month. Please add an income source."
+            );
 
-        var expensesBySource = await _db.BillsHolders
-            .Where(b => b.MonthId == month && b.YearId == year && b.CreatedBy == UserId)
+        var expensesBySource = await _db
+            .BillsHolders.Where(b =>
+                b.MonthId == month && b.YearId == year && b.CreatedBy == UserId
+            )
             .GroupBy(b => b.IncomeSourceId)
             .Select(g => new { IncomeSourceId = g.Key, TotalExpense = g.Sum(x => x.ExpenseAmount) })
             .ToDictionaryAsync(x => x.IncomeSourceId, x => x.TotalExpense);
 
         var remainingBalances = incomeSources.ToDictionary(
             i => i.Id,
-            i => i.IncomeSource.Amount - (expensesBySource.ContainsKey(i.Id) ? expensesBySource[i.Id] : 0)
+            i =>
+                i.IncomeSource.Amount
+                - (expensesBySource.ContainsKey(i.Id) ? expensesBySource[i.Id] : 0)
         );
 
         if (sourceId != 0 && !remainingBalances.ContainsKey(sourceId))
@@ -150,16 +166,20 @@ public class FinanceService : IFinanceService
         await _db.SaveChangesAsync();
         await transaction.CommitAsync();
 
-        var totals = await _db.Users
-            .Where(u => u.Id == UserId)
+        var totals = await _db
+            .Users.Where(u => u.Id == UserId)
             .Select(u => new
             {
-                TotalExpenses = _db.BillsHolders
-                    .Where(b => b.CreatedBy == UserId && b.MonthId == month && b.YearId == year)
-                    .Sum(b => (decimal?)b.ExpenseAmount) ?? 0,
-                TotalIncomes = _db.IncomeSourcesForTheMonth
-                    .Where(i => i.CreatedBy == UserId && i.Month == month && i.Year == year)
-                    .Sum(i => (decimal?)i.IncomeSource.Amount) ?? 0
+                TotalExpenses = _db.BillsHolders.Where(b =>
+                        b.CreatedBy == UserId && b.MonthId == month && b.YearId == year
+                    )
+                    .Sum(b => (decimal?)b.ExpenseAmount)
+                    ?? 0,
+                TotalIncomes = _db.IncomeSourcesForTheMonth.Where(i =>
+                        i.CreatedBy == UserId && i.Month == month && i.Year == year
+                    )
+                    .Sum(i => (decimal?)i.IncomeSource.Amount)
+                    ?? 0,
             })
             .AsNoTracking()
             .FirstAsync();
@@ -172,13 +192,18 @@ public class FinanceService : IFinanceService
             {
                 totals.TotalExpenses,
                 totals.TotalIncomes,
-                TotalBalance = totals.TotalIncomes - totals.TotalExpenses
-            }
+                TotalBalance = totals.TotalIncomes - totals.TotalExpenses,
+            },
         };
     }
 
     // Helper method for readability
-    private BillsHolder CreateBill(BillsHolderRequest request, int incomeSourceId, int month, int year)
+    private BillsHolder CreateBill(
+        BillsHolderRequest request,
+        int incomeSourceId,
+        int month,
+        int year
+    )
     {
         return new BillsHolder
         {
@@ -188,43 +213,84 @@ public class FinanceService : IFinanceService
             MonthId = month,
             YearId = year,
             IsPaid = request.IsPaid,
-            CreatedBy = UserId
+            CreatedBy = UserId,
         };
     }
 
-
     public async Task EditBillsHolder(BillsHolderRequest b, int id)
     {
-        await _db.BillsHolders
-            .Where(o => o.Id == id && o.CreatedBy == UserId)
-            .ExecuteUpdateAsync(setters => setters
-                // .SetProperty(o => o.IncomeSourceId, b.IncomeSourceId)
-                //.SetProperty(o => o.ExpenseId, b.ExpenseId)
-                //.SetProperty(o => o.MonthId, b.MonthId)
-                //.SetProperty(o => o.YearId, b.Year)
-                .SetProperty(o => o.IsPaid, b.IsPaid)
-                .SetProperty(o => o.UpdatedAt, DateTime.UtcNow)
-            );
-    }
-    public async Task FlagIsPaid(int id, bool isPaid)
-    {
-        await _db.BillsHolders
-            .Where(o => o.Id == id && o.CreatedBy == UserId)
-            .ExecuteUpdateAsync(setters => setters
-                .SetProperty(o => o.IsPaid, isPaid)
-                .SetProperty(o => o.UpdatedAt, DateTime.UtcNow)
-            );
-    }
-    public async Task FlagIsPaid(List<int> ids)
-    {
-        await _db.BillsHolders
-            .Where(o => ids.Contains(o.Id) && o.CreatedBy == UserId)
-            .ExecuteUpdateAsync(setters => setters
-                .SetProperty(o => o.IsPaid, true)
-                .SetProperty(o => o.UpdatedAt, DateTime.UtcNow)
+        await _db
+            .BillsHolders.Where(o => o.Id == id && o.CreatedBy == UserId)
+            .ExecuteUpdateAsync(setters =>
+                setters
+                    // .SetProperty(o => o.IncomeSourceId, b.IncomeSourceId)
+                    //.SetProperty(o => o.ExpenseId, b.ExpenseId)
+                    //.SetProperty(o => o.MonthId, b.MonthId)
+                    //.SetProperty(o => o.YearId, b.Year)
+                    .SetProperty(o => o.IsPaid, b.IsPaid)
+                    .SetProperty(o => o.UpdatedAt, DateTime.UtcNow)
             );
     }
 
+    public async Task FlagIsPaid(int id, bool isPaid)
+    {
+        await _db
+            .BillsHolders.Where(o => o.Id == id && o.CreatedBy == UserId)
+            .ExecuteUpdateAsync(setters =>
+                setters
+                    .SetProperty(o => o.IsPaid, isPaid)
+                    .SetProperty(o => o.UpdatedAt, DateTime.UtcNow)
+            );
+    }
+
+    public async Task FlagIsPaid(List<int> ids)
+    {
+        await _db
+            .BillsHolders.Where(o => ids.Contains(o.Id) && o.CreatedBy == UserId)
+            .ExecuteUpdateAsync(setters =>
+                setters
+                    .SetProperty(o => o.IsPaid, true)
+                    .SetProperty(o => o.UpdatedAt, DateTime.UtcNow)
+            );
+    }
+
+    public async Task<ReturnObject> GetTotalInvestment(
+        InvestmentHolderRequest investmentHolderRequest
+    )
+    {
+        DateTime lastDayOfYear = new DateTime(
+            DateTime.UtcNow.Year,
+            12,
+            31,
+            23,
+            59,
+            59,
+            DateTimeKind.Utc
+        );
+        var result = new ReturnObject();
+        var billFilter = CalculateTotalInvestments(
+            investmentHolderRequest.StartDate,
+            investmentHolderRequest.EndDate ?? lastDayOfYear,
+            investmentHolderRequest.Amount
+        );
+         _db.InvestmentHolders.Add(
+            new InvestmentHolder
+            {
+                PrincipalAmount = investmentHolderRequest.Amount,
+                TotalAmountInvested = billFilter.Item1,
+                StartMonth = investmentHolderRequest.StartDate,
+                EndMonth = investmentHolderRequest.EndDate ?? lastDayOfYear,
+                Year = DateTime.UtcNow.Year,
+                CreatedBy = UserId,
+            }
+        );
+        await _db.SaveChangesAsync();
+
+        result.Status = true;
+        result.Data = new { TotalInvestment = billFilter.Item1, TotalRemaining = billFilter.Item2 };
+
+        return result;
+    }
 
     public async Task<ReturnObject> GetIncomeSourcesAsync()
     {
@@ -241,45 +307,36 @@ public class FinanceService : IFinanceService
         int currentYear = DateTime.UtcNow.Year;
 
         // 1. Get all income sources for the month
-        var incomeSources = await _db.IncomeSourcesForTheMonth
-    .Include(i => i.IncomeSource)
-            .Where(i =>
-                i.Month == currentMonth &&
-                i.Year == currentYear &&
-                i.CreatedBy == UserId)
+        var incomeSources = await _db
+            .IncomeSourcesForTheMonth.Include(i => i.IncomeSource)
+            .Where(i => i.Month == currentMonth && i.Year == currentYear && i.CreatedBy == UserId)
             .OrderBy(i => i.CreatedAt)
             .ToListAsync();
-        var expensesByIncomeSource = await _db.BillsHolders
-        .Where(b =>
-            b.MonthId == currentMonth &&
-            b.YearId == currentYear &&
-            b.CreatedBy == UserId)
-        .GroupBy(b => b.IncomeSourceId)
-        .Select(g => new
-        {
-            IncomeSourceId = g.Key,
-            TotalExpense = g.Sum(x => x.ExpenseAmount)
-        })
-        .ToListAsync();
+        var expensesByIncomeSource = await _db
+            .BillsHolders.Where(b =>
+                b.MonthId == currentMonth && b.YearId == currentYear && b.CreatedBy == UserId
+            )
+            .GroupBy(b => b.IncomeSourceId)
+            .Select(g => new { IncomeSourceId = g.Key, TotalExpense = g.Sum(x => x.ExpenseAmount) })
+            .ToListAsync();
 
         // 3. Build remaining balance tracker
         var remainingBalances = incomeSources.ToDictionary(
             i => i.Id,
             i =>
             {
-                var spent = expensesByIncomeSource
-                    .FirstOrDefault(x => x.IncomeSourceId == i.Id)?
-                    .TotalExpense ?? 0;
+                var spent =
+                    expensesByIncomeSource
+                        .FirstOrDefault(x => x.IncomeSourceId == i.Id)
+                        ?.TotalExpense
+                    ?? 0;
 
                 return i.IncomeSource.Amount - spent;
-            });
-        return new ReturnObject
-        {
-            Status = true,
-            Data = remainingBalances.Values.Sum()
-        };
-
+            }
+        );
+        return new ReturnObject { Status = true, Data = remainingBalances.Values.Sum() };
     }
+
     public async Task<ReturnObject> GetPaidBillsForTheMonth(int monthId, int yearId)
     {
         var result = new ReturnObject();
@@ -307,6 +364,7 @@ public class FinanceService : IFinanceService
 
         return result;
     }
+
     public async Task<ReturnObject> GetAllBillsForTheMonth()
     {
         var currentMonth = DateTime.UtcNow.Month;
@@ -322,49 +380,53 @@ public class FinanceService : IFinanceService
 
         return result;
     }
+
     public async Task<ReturnObject> GetUnpaidBills()
     {
         var result = new ReturnObject();
-        var billFilter = GetBillsQuery(GetUserWithAdmin)
-            .Where(b => !b.Paid).AsQueryable();
+        var billFilter = GetBillsQuery(GetUserWithAdmin).Where(b => !b.Paid).AsQueryable();
         var bills = billFilter.ToList();
         result.Status = true;
         result.Data = bills;
 
         return result;
     }
+
     public async Task<ReturnObject> GetIncomeSourcesBalanceAsync()
     {
         var balances = await (
             from i in _db.IncomeSourcesForTheMonth
-            join a in _db.IncomeSources
-            on i.IncomeSourceId equals a.Id
-            join b in _db.BillsHolders
-                on i.Id equals b.IncomeSourceId into bills
+            join a in _db.IncomeSources on i.IncomeSourceId equals a.Id
+            join b in _db.BillsHolders on i.Id equals b.IncomeSourceId into bills
             select new
             {
                 i.Id,
                 a.Name,
                 TotalBills = bills.Sum(x => (decimal?)x.ExpenseAmount) ?? 0,
-                Balance = a.Amount -
-                          (bills.Sum(x => (decimal?)x.ExpenseAmount) ?? 0)
+                Balance = a.Amount - (bills.Sum(x => (decimal?)x.ExpenseAmount) ?? 0),
             }
         ).ToListAsync();
-        return new ReturnObject { Data = balances, Message = "Balance Found Successfully", Status = true };
-
+        return new ReturnObject
+        {
+            Data = balances,
+            Message = "Balance Found Successfully",
+            Status = true,
+        };
     }
+
     private IQueryable<IncomeSource> GetIncomeQuery(IReadOnlyCollection<int> userId)
     {
         return _db.IncomeSources.Where(i => userId.Contains(i.CreatedBy)).AsQueryable();
     }
+
     private IQueryable<BillResponse> GetBillsQuery(IReadOnlyCollection<int> userId)
     {
-        return _db.BillsHolders
-            .Where(o => userId.Contains(o.CreatedBy))
+        return _db
+            .BillsHolders.Where(o => userId.Contains(o.CreatedBy))
             .Include(b => b.IncomeSource)
-             // .Include(b => b.Expense)
-             .AsEnumerable()
-             .OrderBy(o => o.IncomeSource.PaymentDate)
+            // .Include(b => b.Expense)
+            .AsEnumerable()
+            .OrderBy(o => o.IncomeSource.PaymentDate)
             .Select(b => new BillResponse
             {
                 Id = b.Id,
@@ -375,10 +437,11 @@ public class FinanceService : IFinanceService
                 PaymentDate = b.IncomeSource.PaymentDate,
                 Month = GetMonthName(b.MonthId),
                 Year = b.YearId,
-                Paid = b.IsPaid
+                Paid = b.IsPaid,
             })
             .AsQueryable();
     }
+
     private string GetMonthName(int monthId)
     {
         if (monthId < 1 || monthId > 12)
@@ -387,5 +450,23 @@ public class FinanceService : IFinanceService
         return CultureInfo.CurrentCulture.DateTimeFormat.GetMonthName(monthId);
     }
 
+    ///  Investment  methods
+    private IQueryable<InvestmentHolder> GetInvestmentQuery(IReadOnlyCollection<int> userId)
+    {
+        return _db.InvestmentHolders.Where(i => userId.Contains(i.CreatedBy)).AsQueryable();
+    }
 
+    private (decimal, decimal) CalculateTotalInvestments(
+        DateTime startDate,
+        DateTime endDate,
+        Decimal amount
+    )
+    {
+        var interest = InterestCalculator.CalculateSpecialInterestWithReinvestment(
+            amount,
+            startDate,
+            endDate
+        );
+        return interest;
+    }
 }

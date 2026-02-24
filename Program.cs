@@ -170,6 +170,11 @@ app.MapPost("/api/bills/paid-bill/{billid}", async (int billid, BillsHolderReque
     await service.EditBillsHolder(bill, billid);
     return Results.Ok();
 }).RequireAuthorization().WithTags("Bills");
+app.MapPost("/api/investment", async (InvestmentHolderRequest amount, IFinanceService service) =>
+{
+    var ret = await service.GetTotalInvestment(amount);
+    return Results.Ok(ret);
+}).WithTags("Investment");
 
 app.MapPost("/api/bills/flag-bill/{billid}", async (int billid, bool isPaid, IFinanceService service) =>
 {

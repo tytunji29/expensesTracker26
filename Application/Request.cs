@@ -37,6 +37,12 @@ public class BillsHolderRequest
     public required bool IsPaid { get; set; }
 }
 
+public class InvestmentHolderRequest
+{
+    public required decimal Amount { get; set; }
+    public required DateTime StartDate { get; set; }
+    public DateTime? EndDate { get; set; }
+}
 public class AppUserRequest
 {
     public required string Email { get; set; }
