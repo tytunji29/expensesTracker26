@@ -273,17 +273,19 @@ public class FinanceService : IFinanceService
             investmentHolderRequest.EndDate ?? lastDayOfYear,
             investmentHolderRequest.Amount
         );
-         _db.InvestmentHolders.Add(
-            new InvestmentHolder
-            {
-                PrincipalAmount = investmentHolderRequest.Amount,
-                TotalAmountInvested = billFilter.Item1,
-                StartMonth = investmentHolderRequest.StartDate,
-                EndMonth = investmentHolderRequest.EndDate ?? lastDayOfYear,
-                Year = DateTime.UtcNow.Year,
-                CreatedBy = UserId,
-            }
-        );
+       var endDate = investmentHolderRequest.EndDate ?? lastDayOfYear;
+
+_db.InvestmentHolders.Add(
+    new InvestmentHolder
+    {
+        PrincipalAmount = investmentHolderRequest.Amount,
+        TotalAmountInvested = billFilter.Item1,
+        StartMonth = investmentHolderRequest.StartDate.ToUniversalTime(),
+        EndMonth = endDate.ToUniversalTime(),
+        Year = DateTime.UtcNow.Year,
+        CreatedBy = 0,
+    }
+);
         await _db.SaveChangesAsync();
 
         result.Status = true;

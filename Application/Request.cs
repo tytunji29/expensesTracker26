@@ -3,7 +3,7 @@ namespace expensesTracker26.Application.Requests;
 public class UpdateById<TRequest>
 {
     public int Id { get; set; }
-    public required TRequest Data { get; set; }
+    public  TRequest Data { get; set; }
 }
 
 
@@ -21,30 +21,30 @@ public class IncomeSourceForTheMonthRequest
 }
 public class IncomeSourceRequest
 {
-    public required string Name { get; set; }
+    public  string Name { get; set; }
     public decimal Amount { get; set; }
 }
 public class ExpenseRequest
 {
-    public required string Name { get; set; }
+    public  string Name { get; set; }
     public decimal Amount { get; set; }
 }
 
 public class BillsHolderRequest
 {
-    public required decimal ExpenseAmount { get; set; }
-    public required string ExpenseName { get; set; }
-    public required bool IsPaid { get; set; }
+    public  decimal ExpenseAmount { get; set; }
+    public  string ExpenseName { get; set; }
+    public  bool IsPaid { get; set; }
 }
 
 public class InvestmentHolderRequest
 {
-    public required decimal Amount { get; set; }
-    public required DateTime StartDate { get; set; }
+    public  decimal Amount { get; set; }
+    public  DateTime StartDate { get; set; }
     public DateTime? EndDate { get; set; }
 }
 public class AppUserRequest
 {
-    public required string Email { get; set; }
-    public required string Password { get; set; }
+    public  string Email { get; set; }
+    public  string Password { get; set; }
 }
