@@ -1,14 +1,17 @@
-using Microsoft.EntityFrameworkCore;
 using expensesTracker26.Domain;
+using Microsoft.EntityFrameworkCore;
 
 namespace expensesTracker26.Infrastructure;
 
 public class AppDbContext : DbContext
 {
-    public AppDbContext(DbContextOptions<AppDbContext> options) : base(options) { }
+    public AppDbContext(DbContextOptions<AppDbContext> options)
+        : base(options) { }
+
     public DbSet<AppUser> Users => Set<AppUser>();
     public DbSet<IncomeSource> IncomeSources => Set<IncomeSource>();
-    public DbSet<IncomeSourceForTheMonth> IncomeSourcesForTheMonth => Set<IncomeSourceForTheMonth>();
+    public DbSet<IncomeSourceForTheMonth> IncomeSourcesForTheMonth =>
+        Set<IncomeSourceForTheMonth>();
     public DbSet<InvestmentHolder> InvestmentHolders => Set<InvestmentHolder>();
     public DbSet<BillsHolder> BillsHolders => Set<BillsHolder>();
 
@@ -16,13 +19,20 @@ public class AppDbContext : DbContext
     {
         base.OnModelCreating(modelBuilder);
 
-        modelBuilder.Entity<BillsHolder>()
+        modelBuilder
+            .Entity<BillsHolder>()
             .HasOne(b => b.IncomeSource)
             .WithMany(i => i.BillsHolders)
             .HasForeignKey(b => b.IncomeSourceId);
 
-        modelBuilder.Entity<BillsHolder>()
-            .HasIndex(b => new { b.IncomeSourceId, b.MonthId, b.YearId });
+        modelBuilder
+            .Entity<BillsHolder>()
+            .HasIndex(b => new
+            {
+                b.IncomeSourceId,
+                b.MonthId,
+                b.YearId,
+            });
         //.IsUnique();
     }
 }

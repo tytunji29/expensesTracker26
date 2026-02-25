@@ -21,6 +21,7 @@ public interface IFinanceService
     Task AddIncomeSourceForTheMonth(IncomeSourceForTheMonthRequest income);
     Task<ReturnObject> GetTotalBalanceAsync();
     Task FlagIsPaid(List<int> ids);
+    Task<ReturnObject> GetInvestmentHolders();
     Task<ReturnObject> GetTotalInvestment(InvestmentHolderRequest investmentHolderRequest);
 }
 
@@ -119,14 +120,11 @@ public class FinanceService : IFinanceService
             .ToDictionaryAsync(x => x.IncomeSourceId, x => x.TotalExpense);
 
         var remainingBalances = incomeSources.ToDictionary(
-            i => i.Id,
+            i => i.IncomeSourceId,
             i =>
                 i.IncomeSource.Amount
                 - (expensesBySource.ContainsKey(i.Id) ? expensesBySource[i.Id] : 0)
         );
-
-        if (sourceId != 0 && !remainingBalances.ContainsKey(sourceId))
-            throw new Exception("Specified income source not found for the current month.");
 
         var billsToInsert = new List<BillsHolder>();
 
@@ -273,19 +271,19 @@ public class FinanceService : IFinanceService
             investmentHolderRequest.EndDate ?? lastDayOfYear,
             investmentHolderRequest.Amount
         );
-       var endDate = investmentHolderRequest.EndDate ?? lastDayOfYear;
+        var endDate = investmentHolderRequest.EndDate ?? lastDayOfYear;
 
-_db.InvestmentHolders.Add(
-    new InvestmentHolder
-    {
-        PrincipalAmount = investmentHolderRequest.Amount,
-        TotalAmountInvested = billFilter.Item1,
-        StartMonth = investmentHolderRequest.StartDate.ToUniversalTime(),
-        EndMonth = endDate.ToUniversalTime(),
-        Year = DateTime.UtcNow.Year,
-        CreatedBy = 0,
-    }
-);
+        _db.InvestmentHolders.Add(
+            new InvestmentHolder
+            {
+                PrincipalAmount = investmentHolderRequest.Amount,
+                TotalAmountInvested = billFilter.Item1,
+                StartMonth = investmentHolderRequest.StartDate.ToUniversalTime(),
+                EndMonth = endDate.ToUniversalTime(),
+                Year = DateTime.UtcNow.Year,
+                CreatedBy = 0,
+            }
+        );
         await _db.SaveChangesAsync();
 
         result.Status = true;
@@ -294,6 +292,14 @@ _db.InvestmentHolders.Add(
         return result;
     }
 
+    public async Task<ReturnObject> GetInvestmentHolders()
+    {
+        var result = new ReturnObject();
+        var investments = await GetInvestmentQuery(GetUserWithAdmin).ToListAsync();
+        result.Status = true;
+        result.Data = investments;
+        return result;
+    }
     public async Task<ReturnObject> GetIncomeSourcesAsync()
     {
         var result = new ReturnObject();

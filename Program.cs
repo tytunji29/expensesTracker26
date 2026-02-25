@@ -1,29 +1,33 @@
 using System.Text;
-using Microsoft.EntityFrameworkCore;
-using Microsoft.AspNetCore.Server.Kestrel.Core;
-using Microsoft.OpenApi;
-
 using expensesTracker26.Application.Requests;
 using expensesTracker26.Infrastructure;
-using Microsoft.OpenApi.Models;
+using Microsoft.AspNetCore.Server.Kestrel.Core;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
+using Microsoft.OpenApi;
+using Microsoft.OpenApi.Models;
 
 var builder = WebApplication.CreateBuilder(args);
-
 
 builder.WebHost.ConfigureKestrel(options =>
 {
     // gRPC (HTTP/2 - clear text)
-    options.ListenAnyIP(5080, o =>
-    {
-        o.Protocols = HttpProtocols.Http2;
-    });
+    options.ListenAnyIP(
+        5080,
+        o =>
+        {
+            o.Protocols = HttpProtocols.Http2;
+        }
+    );
 
     // REST + Swagger
-    options.ListenAnyIP(5079, o =>
-    {
-        o.Protocols = HttpProtocols.Http1;
-    });
+    options.ListenAnyIP(
+        5079,
+        o =>
+        {
+            o.Protocols = HttpProtocols.Http1;
+        }
+    );
 });
 
 // REST + gRPC
@@ -38,7 +42,7 @@ builder.Services.AddSwaggerGen(c =>
         Scheme = "Bearer",
         BearerFormat = "JWT",
         In = ParameterLocation.Header,
-        Description = "Enter: Bearer {token}"
+        Description = "Enter: Bearer {token}",
     };
 
     c.AddSecurityDefinition("Bearer", securityScheme);
@@ -50,25 +54,27 @@ builder.Services.AddSwaggerGen(c =>
 // Read connection string from appsettings.json
 var connectionString = builder.Configuration.GetConnectionString("DefaultConnection");
 
-builder.Services.AddDbContext<AppDbContext>(options =>
-    options.UseNpgsql(connectionString)
-);
-builder.Services.AddAuthentication("Bearer")
-    .AddJwtBearer("Bearer", options =>
-    {
-        options.TokenValidationParameters = new TokenValidationParameters
+builder.Services.AddDbContext<AppDbContext>(options => options.UseNpgsql(connectionString));
+builder
+    .Services.AddAuthentication("Bearer")
+    .AddJwtBearer(
+        "Bearer",
+        options =>
         {
-            ValidateIssuer = false,
-            ValidateAudience = true,
-            ValidateLifetime = true,
-            ValidateIssuerSigningKey = true,
-            ValidIssuer = builder.Configuration["Jwt:Issuer"],
-            ValidAudience = builder.Configuration["Jwt:Audience"],
-            IssuerSigningKey = new SymmetricSecurityKey(
-                Encoding.UTF8.GetBytes(builder.Configuration["Jwt:Key"]!)
-            )
-        };
-    });
+            options.TokenValidationParameters = new TokenValidationParameters
+            {
+                ValidateIssuer = false,
+                ValidateAudience = true,
+                ValidateLifetime = true,
+                ValidateIssuerSigningKey = true,
+                ValidIssuer = builder.Configuration["Jwt:Issuer"],
+                ValidAudience = builder.Configuration["Jwt:Audience"],
+                IssuerSigningKey = new SymmetricSecurityKey(
+                    Encoding.UTF8.GetBytes(builder.Configuration["Jwt:Key"]!)
+                ),
+            };
+        }
+    );
 
 builder.Services.AddAuthorization();
 
@@ -84,24 +90,38 @@ app.UseSwaggerUI();
 
 // ===== REST endpoints =====
 
-app.MapPost("/api/incomes", async (IncomeSourceRequest income, IFinanceService service) =>
-{
-    await service.AddIncomeSource(income);
-    return Results.Ok();
-}).RequireAuthorization().WithTags("Income");
+app.MapPost(
+        "/api/incomes",
+        async (IncomeSourceRequest income, IFinanceService service) =>
+        {
+            await service.AddIncomeSource(income);
+            return Results.Ok();
+        }
+    )
+    .RequireAuthorization()
+    .WithTags("Income");
 
-app.MapPost("/api/IncomeSourceForTheMonth", async (IncomeSourceForTheMonthRequest income, IFinanceService service) =>
-{
-    await service.AddIncomeSourceForTheMonth(income);
-    return Results.Ok();
-}).RequireAuthorization().WithTags("IncomeForTheMonth");
+app.MapPost(
+        "/api/IncomeSourceForTheMonth",
+        async (IncomeSourceForTheMonthRequest income, IFinanceService service) =>
+        {
+            await service.AddIncomeSourceForTheMonth(income);
+            return Results.Ok();
+        }
+    )
+    .RequireAuthorization()
+    .WithTags("IncomeForTheMonth");
 
-app.MapPost("/api/update-incomesource", async (UpdateById<IncomeSourceRequest> income, IFinanceService service) =>
-{
-    await service.UpdateIncomeSource(income);
-    return Results.Ok();
-}).RequireAuthorization().WithTags("Income");
-
+app.MapPost(
+        "/api/update-incomesource",
+        async (UpdateById<IncomeSourceRequest> income, IFinanceService service) =>
+        {
+            await service.UpdateIncomeSource(income);
+            return Results.Ok();
+        }
+    )
+    .RequireAuthorization()
+    .WithTags("Income");
 
 // app.MapPost("/api/bills", async (BillsHolderRequest billsHolder, IFinanceService service) =>
 // {
@@ -109,78 +129,149 @@ app.MapPost("/api/update-incomesource", async (UpdateById<IncomeSourceRequest> i
 //     return Results.Ok();
 // }).RequireAuthorization().WithTags("Bills");
 
-app.MapPost("/api/bills-list/{sourceId}", async (int sourceId, List<BillsHolderRequest> billsHolder, IFinanceService service) =>
-{
-    var res = await service.AddBillsHolder(sourceId, billsHolder);
-    return Results.Ok(res);
-}).RequireAuthorization().WithTags("Bills");
-app.MapPost("/api/register", async (AppUserRequest billsHolder, ILoginService service) =>
-{
-    var ret = await service.RegisterAsync(billsHolder);
-    return Results.Ok(ret);
-}).WithTags("Authentication");
+app.MapPost(
+        "/api/bills-list/{sourceId}",
+        async (int sourceId, List<BillsHolderRequest> billsHolder, IFinanceService service) =>
+        {
+            var res = await service.AddBillsHolder(sourceId, billsHolder);
+            return Results.Ok(res);
+        }
+    )
+    .RequireAuthorization()
+    .WithTags("Bills");
+app.MapPost(
+        "/api/register",
+        async (AppUserRequest billsHolder, ILoginService service) =>
+        {
+            var ret = await service.RegisterAsync(billsHolder);
+            return Results.Ok(ret);
+        }
+    )
+    .WithTags("Authentication");
 
-app.MapPost("/api/login", async (AppUserRequest billsHolder, ILoginService service) =>
-{
-    var ret = await service.LoginAsync(billsHolder);
-    return Results.Ok(ret);
-}).WithTags("Authentication");
-app.MapGet("/api/incomes", async (IFinanceService service) =>
-{
-    var ret = await service.GetIncomeSourcesAsync();
-    return Results.Ok(ret);
-}).RequireAuthorization().WithTags("Income");
-app.MapGet("/api/income-sources/balances", async (IFinanceService service) =>
-{
-    var ret = await service.GetIncomeSourcesBalanceAsync();
-    return Results.Ok(ret);
-}).RequireAuthorization().WithTags("Income");
+app.MapPost(
+        "/api/login",
+        async (AppUserRequest billsHolder, ILoginService service) =>
+        {
+            var ret = await service.LoginAsync(billsHolder);
+            return Results.Ok(ret);
+        }
+    )
+    .WithTags("Authentication");
+app.MapGet(
+        "/api/incomes",
+        async (IFinanceService service) =>
+        {
+            var ret = await service.GetIncomeSourcesAsync();
+            return Results.Ok(ret);
+        }
+    )
+    .RequireAuthorization()
+    .WithTags("Income");
+app.MapGet(
+        "/api/income-sources/balances",
+        async (IFinanceService service) =>
+        {
+            var ret = await service.GetIncomeSourcesBalanceAsync();
+            return Results.Ok(ret);
+        }
+    )
+    .RequireAuthorization()
+    .WithTags("Income");
 
-app.MapGet("/api/bills/unpaid-bills", async (IFinanceService service) =>
-{
-    var ret = await service.GetUnpaidBills();
-    return Results.Ok(ret);
-}).RequireAuthorization().WithTags("Bills");
-app.MapGet("/api/bills/allbills", async (IFinanceService service) =>
-{
-    var ret = await service.GetAllBillsForTheMonth();
-    return Results.Ok(ret);
-}).RequireAuthorization().WithTags("Bills");
+app.MapGet(
+        "/api/bills/unpaid-bills",
+        async (IFinanceService service) =>
+        {
+            var ret = await service.GetUnpaidBills();
+            return Results.Ok(ret);
+        }
+    )
+    .RequireAuthorization()
+    .WithTags("Bills");
+app.MapGet(
+        "/api/bills/allbills",
+        async (IFinanceService service) =>
+        {
+            var ret = await service.GetAllBillsForTheMonth();
+            return Results.Ok(ret);
+        }
+    )
+    .RequireAuthorization()
+    .WithTags("Bills");
 
-app.MapGet("/api/bills/paid-bills-forthemonth/{monthId}/{year}", async (int monthId, int year, IFinanceService service) =>
-{
-    var ret = await service.GetPaidBillsForTheMonth(monthId, year);
-    return Results.Ok(ret);
-}).RequireAuthorization().WithTags("Bills");
+app.MapGet(
+        "/api/bills/paid-bills-forthemonth/{monthId}/{year}",
+        async (int monthId, int year, IFinanceService service) =>
+        {
+            var ret = await service.GetPaidBillsForTheMonth(monthId, year);
+            return Results.Ok(ret);
+        }
+    )
+    .RequireAuthorization()
+    .WithTags("Bills");
 
-app.MapGet("/api/bills/unpaid-bills-forthemonth/{monthId}/{year}", async (int monthId, int year, IFinanceService service) =>
-{
-    var ret = await service.GetUnPaidBillsForTheMonth(monthId, year);
-    return Results.Ok(ret);
-}).RequireAuthorization().WithTags("Bills");
+app.MapGet(
+        "/api/bills/unpaid-bills-forthemonth/{monthId}/{year}",
+        async (int monthId, int year, IFinanceService service) =>
+        {
+            var ret = await service.GetUnPaidBillsForTheMonth(monthId, year);
+            return Results.Ok(ret);
+        }
+    )
+    .RequireAuthorization()
+    .WithTags("Bills");
 
-app.MapGet("/api/unplanned-balance", async (IFinanceService service) =>
-{
-    var ret = await service.GetTotalBalanceAsync();
-    return Results.Ok(ret);
-}).RequireAuthorization().WithTags("Bills");
+app.MapGet(
+        "/api/unplanned-balance",
+        async (IFinanceService service) =>
+        {
+            var ret = await service.GetTotalBalanceAsync();
+            return Results.Ok(ret);
+        }
+    )
+    .RequireAuthorization()
+    .WithTags("Bills");
 
-app.MapPost("/api/bills/paid-bill/{billid}", async (int billid, BillsHolderRequest bill, IFinanceService service) =>
-{
-    await service.EditBillsHolder(bill, billid);
-    return Results.Ok();
-}).RequireAuthorization().WithTags("Bills");
-app.MapPost("/api/investment", async (InvestmentHolderRequest amount, IFinanceService service) =>
-{
-    var ret = await service.GetTotalInvestment(amount);
-    return Results.Ok(ret);
-}).WithTags("Investment");
-
-app.MapPost("/api/bills/flag-bill/{billid}", async (int billid, bool isPaid, IFinanceService service) =>
-{
-    await service.FlagIsPaid(billid, isPaid);
-    return Results.Ok();
-}).RequireAuthorization().WithTags("Bills");
+app.MapPost(
+        "/api/bills/paid-bill/{billid}",
+        async (int billid, BillsHolderRequest bill, IFinanceService service) =>
+        {
+            await service.EditBillsHolder(bill, billid);
+            return Results.Ok();
+        }
+    )
+    .RequireAuthorization()
+    .WithTags("Bills");
+app.MapPost(
+        "/api/investment",
+        async (InvestmentHolderRequest amount, IFinanceService service) =>
+        {
+            var ret = await service.GetTotalInvestment(amount);
+            return Results.Ok(ret);
+        }
+    )
+    .WithTags("Investment");
+app.MapGet(
+        "/api/investment",
+        async (IFinanceService service) =>
+        {
+            var ret = await service.GetInvestmentHolders();
+            return Results.Ok(ret);
+        }
+    )
+    .RequireAuthorization()
+    .WithTags("Investment");
+app.MapPost(
+        "/api/bills/flag-bill/{billid}",
+        async (int billid, bool isPaid, IFinanceService service) =>
+        {
+            await service.FlagIsPaid(billid, isPaid);
+            return Results.Ok();
+        }
+    )
+    .RequireAuthorization()
+    .WithTags("Bills");
 
 // ===== gRPC =====
 //app.MapGrpcService<FinanceGrpcService>();

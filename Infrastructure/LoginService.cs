@@ -3,8 +3,8 @@ using System.Security.Claims;
 using System.Text;
 using expensesTracker26.Application.Requests;
 using expensesTracker26.Infrastructure;
-using Microsoft.IdentityModel.Tokens;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.IdentityModel.Tokens;
 
 public interface ILoginService
 {
@@ -31,7 +31,7 @@ public class LoginService : ILoginService
         var user = new AppUser
         {
             Email = request.Email.ToLower(),
-            PasswordHash = BCrypt.Net.BCrypt.HashPassword(request.Password)
+            PasswordHash = BCrypt.Net.BCrypt.HashPassword(request.Password),
         };
 
         _db.Users.Add(user);
@@ -41,17 +41,16 @@ public class LoginService : ILoginService
         {
             Status = true,
             Message = "User registered successfully",
-            Data = GenerateToken(user)
+            Data = GenerateToken(user),
         };
-
     }
+
     public async Task<ReturnObject> LoginAsync(AppUserRequest request)
     {
-
         int currentMonth = DateTime.UtcNow.Month;
         int currentYear = DateTime.UtcNow.Year;
-        var user = await _db.Users
-            .AsNoTracking()
+        var user = await _db
+            .Users.AsNoTracking()
             .FirstOrDefaultAsync(u => u.Email.ToLower() == request.Email.ToLower());
 
         if (user == null || !BCrypt.Net.BCrypt.Verify(request.Password, user.PasswordHash))
@@ -59,13 +58,15 @@ public class LoginService : ILoginService
 
         var userId = user.Id;
 
-        var totalExpenses = await _db.BillsHolders
-            .AsNoTracking()
-            .Where(e => e.CreatedBy == userId && e.MonthId == currentMonth && e.YearId == currentYear)
+        var totalExpenses = await _db
+            .BillsHolders.AsNoTracking()
+            .Where(e =>
+                e.CreatedBy == userId && e.MonthId == currentMonth && e.YearId == currentYear
+            )
             .SumAsync(e => e.ExpenseAmount);
 
-        var totalIncomes = await _db.IncomeSourcesForTheMonth
-            .AsNoTracking()
+        var totalIncomes = await _db
+            .IncomeSourcesForTheMonth.AsNoTracking()
             .Where(i => i.CreatedBy == userId && i.Month == currentMonth && i.Year == currentYear)
             .SumAsync(i => i.IncomeSource.Amount);
 
@@ -81,24 +82,21 @@ public class LoginService : ILoginService
                 totalExpenses,
                 totalIncomes,
                 totalBalance = totalIncomes - totalExpenses,
-                user.Email
-            }
+                user.Email,
+            },
         };
     }
-
 
     private string GenerateToken(AppUser user)
     {
         var claims = new[]
         {
-        new Claim(JwtRegisteredClaimNames.Sub, user.Id.ToString()),
-        new Claim("userId", user.Id.ToString()),
-        new Claim(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString())
+            new Claim(JwtRegisteredClaimNames.Sub, user.Id.ToString()),
+            new Claim("userId", user.Id.ToString()),
+            new Claim(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString()),
         };
 
-        var key = new SymmetricSecurityKey(
-            Encoding.UTF8.GetBytes(_config["Jwt:Key"]!)
-        );
+        var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_config["Jwt:Key"]!));
 
         var creds = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
 
@@ -106,13 +104,10 @@ public class LoginService : ILoginService
             issuer: _config["Jwt:Issuer"],
             audience: _config["Jwt:Audience"],
             claims: claims,
-            expires: DateTime.UtcNow.AddMinutes(
-                int.Parse(_config["Jwt:ExpiryMinutes"]!)
-            ),
+            expires: DateTime.UtcNow.AddMinutes(int.Parse(_config["Jwt:ExpiryMinutes"]!)),
             signingCredentials: creds
         );
 
         return new JwtSecurityTokenHandler().WriteToken(token);
     }
-
 }
